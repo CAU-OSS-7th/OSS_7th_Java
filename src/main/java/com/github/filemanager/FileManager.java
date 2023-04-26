@@ -111,6 +111,7 @@ public class FileManager {
     private JButton printFile;
     private JButton editFile;
     private JButton deleteFile;
+    private JButton newdeltefile;
     private JButton newFile;
     private JButton copyFile;
     /* File details. */
@@ -123,6 +124,8 @@ public class FileManager {
     private JCheckBox executable;
     private JRadioButton isDirectory;
     private JRadioButton isFile;
+    // 이슈 예시
+    // private JRadioButton isHidden;
 
     /* GUI options/containers for new File/Directory creation.  Created lazily. */
     private JPanel newFilePanel;
@@ -189,6 +192,8 @@ public class FileManager {
                 }
                 //
             }
+
+
 
             tree = new JTree(treeModel);
             tree.setRootVisible(false);
