@@ -125,6 +125,7 @@ public class FileManager {
     private JRadioButton isDirectory;
     private JRadioButton isFile;
     // 이슈 예시
+    // private JRadioButton isHidden;
 
     /* GUI options/containers for new File/Directory creation.  Created lazily. */
     private JPanel newFilePanel;
