@@ -46,6 +46,7 @@ import javax.swing.event.*;
 import javax.swing.filechooser.FileSystemView;
 import javax.swing.table.*;
 import javax.swing.tree.*;
+
 import org.apache.commons.io.FileUtils;
 
 /**
@@ -77,29 +78,45 @@ import org.apache.commons.io.FileUtils;
  */
 public class FileManager {
 
-    /** Title of the application */
+    /**
+     * Title of the application
+     */
     public static final String APP_TITLE = "FileMan";
-    /** Used to open/edit/print files. */
+    /**
+     * Used to open/edit/print files.
+     */
     private Desktop desktop;
-    /** Provides nice icons and names for files. */
+    /**
+     * Provides nice icons and names for files.
+     */
     private FileSystemView fileSystemView;
 
-    /** currently selected File. */
+    /**
+     * currently selected File.
+     */
     private File currentFile;
 
-    /** Main GUI container */
+    /**
+     * Main GUI container
+     */
     private JPanel gui;
 
-    /** File-system tree. Built Lazily */
+    /**
+     * File-system tree. Built Lazily
+     */
     private JTree tree;
 
     private DefaultTreeModel treeModel;
 
-    /** Directory listing */
+    /**
+     * Directory listing
+     */
     private JTable table;
 
     private JProgressBar progressBar;
-    /** Table model for File[]. */
+    /**
+     * Table model for File[].
+     */
     private FileTableModel fileTableModel;
 
     private ListSelectionListener listSelectionListener;
@@ -114,6 +131,18 @@ public class FileManager {
     private JButton newdeltefile;
     private JButton newFile;
     private JButton copyFile;
+
+    /* 새로 추가한 git 버튼 */
+    private JButton gitInitFile; // git init
+    private JButton gitAddFile; // git add
+    private JButton gitCommitFile; // git commit
+    private JButton gitMvFile; // git mv
+    private JButton gitRmFile; // git rm
+    private JButton gitRmCachedFile; // git rm --cached
+    private JButton gitRestoreFile; // git restore
+    private JButton gitRestoreStagedFile; // git restore --staged
+
+
     /* File details. */
     private JLabel fileName;
     private JTextField path;
@@ -124,8 +153,6 @@ public class FileManager {
     private JCheckBox executable;
     private JRadioButton isDirectory;
     private JRadioButton isFile;
-    // 이슈 예시
-    // private JRadioButton isHidden;
 
     /* GUI options/containers for new File/Directory creation.  Created lazily. */
     private JPanel newFilePanel;
@@ -192,7 +219,6 @@ public class FileManager {
                 }
                 //
             }
-
 
 
             tree = new JTree(treeModel);
@@ -343,6 +369,96 @@ public class FileManager {
                         }
                     });
             toolBar.add(deleteFile);
+
+            /* git 버튼 객체 생성 로직 */
+
+            // 1. init 버튼
+            gitInitFile = new JButton("Git init");
+            gitInitFile.setMnemonic('I');
+            gitInitFile.addActionListener(
+                    new ActionListener() {
+                        public void actionPerformed(ActionEvent ae) {
+                            // 여기에다가 init 로직 추가
+                        }
+                    });
+            toolBar.add(gitInitFile);
+
+            // 2. add 버튼
+            gitAddFile = new JButton("Git add");
+            gitAddFile.setMnemonic('A');
+            gitAddFile.addActionListener(
+                    new ActionListener() {
+                        public void actionPerformed(ActionEvent ae) {
+                            // 여기에다가 add 로직 추가
+                        }
+                    });
+            toolBar.add(gitAddFile);
+
+            // 3. commit 버튼
+            gitCommitFile = new JButton("Git commit");
+            gitCommitFile.setMnemonic('C');
+            gitCommitFile.addActionListener(
+                    new ActionListener() {
+                        public void actionPerformed(ActionEvent ae) {
+                            // 여기에다가 commit 로직 추가
+                        }
+                    });
+            toolBar.add(gitCommitFile);
+
+            // 4. mv 버튼
+            gitMvFile = new JButton("Git mv");
+            gitMvFile.setMnemonic('M');
+            gitMvFile.addActionListener(
+                    new ActionListener() {
+                        public void actionPerformed(ActionEvent ae) {
+                            // 여기에다가 mv 로직 추가
+                        }
+                    });
+            toolBar.add(gitMvFile);
+
+            // 5. rm 버튼
+            gitRmFile = new JButton("Git rm");
+            gitRmFile.setMnemonic('R');
+            gitRmFile.addActionListener(
+                    new ActionListener() {
+                        public void actionPerformed(ActionEvent ae) {
+                            // 여기에다가 rm 로직 추가
+                        }
+                    });
+            toolBar.add(gitRmFile);
+
+            // 6. rm --cached 버튼
+            gitRmCachedFile = new JButton("Git rm --cached");
+            gitRmCachedFile.setMnemonic('R');
+            gitRmCachedFile.addActionListener(
+                    new ActionListener() {
+                        public void actionPerformed(ActionEvent ae) {
+                            // 여기에다가 rm --cached 로직 추가
+                        }
+                    });
+            toolBar.add(gitRmCachedFile);
+
+            // 7. restore 버튼
+            gitRestoreFile = new JButton("Git restore");
+            gitRestoreFile.setMnemonic('R');
+            gitRestoreFile.addActionListener(
+                    new ActionListener() {
+                        public void actionPerformed(ActionEvent ae) {
+                            // 여기에다가 restore 로직 추가
+                        }
+                    });
+            toolBar.add(gitRestoreFile);
+
+            // 8. restore --staged 버튼
+            gitRestoreStagedFile = new JButton("Git restore --staged");
+            gitRestoreStagedFile.setMnemonic('R');
+            gitRestoreStagedFile.addActionListener(
+                    new ActionListener() {
+                        public void actionPerformed(ActionEvent ae) {
+                            // 여기에다가 restore --staged 로직 추가
+                        }
+                    });
+            toolBar.add(gitRestoreStagedFile);
 
             toolBar.addSeparator();
 
@@ -570,7 +686,9 @@ public class FileManager {
         gui.repaint();
     }
 
-    /** Update the table on the EDT */
+    /**
+     * Update the table on the EDT
+     */
     private void setTableData(final File[] files) {
         SwingUtilities.invokeLater(
                 new Runnable() {
@@ -664,7 +782,9 @@ public class FileManager {
         worker.execute();
     }
 
-    /** Update the File details view with the details of this File. */
+    /**
+     * Update the File details view with the details of this File.
+     */
     private void setFileDetails(File file) {
         currentFile = file;
         Icon icon = fileSystemView.getSystemIcon(file);
@@ -755,13 +875,15 @@ public class FileManager {
     }
 }
 
-/** A TableModel to hold File[]. */
+/**
+ * A TableModel to hold File[].
+ */
 class FileTableModel extends AbstractTableModel {
 
     private File[] files;
     private FileSystemView fileSystemView = FileSystemView.getFileSystemView();
     private String[] columns = {
-        "Icon", "File", "Path/name", "Size", "Last Modified", "R", "W", "E", "D", "F",
+            "Icon", "File", "Path/name", "Size", "Last Modified", "R", "W", "E", "D", "F",
     };
 
     FileTableModel() {
@@ -841,7 +963,9 @@ class FileTableModel extends AbstractTableModel {
     }
 }
 
-/** A TreeCellRenderer for a File. */
+/**
+ * A TreeCellRenderer for a File.
+ */
 class FileTreeCellRenderer extends DefaultTreeCellRenderer {
 
     private FileSystemView fileSystemView;
