@@ -32,7 +32,6 @@ import java.awt.FlowLayout;
 import java.awt.GridLayout;
 import java.awt.Image;
 import java.awt.event.*;
-import java.awt.image.*;
 import java.io.*;
 import java.net.URL;
 import java.nio.channels.FileChannel;
@@ -128,7 +127,6 @@ public class FileManager {
     private JButton printFile;
     private JButton editFile;
     private JButton deleteFile;
-    private JButton newdeltefile;
     private JButton newFile;
     private JButton copyFile;
 
