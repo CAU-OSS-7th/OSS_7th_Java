@@ -366,7 +366,7 @@ public class FileManager {
             gitInitFile.setMnemonic('I');
             gitInitFile.addActionListener(new ActionListener() {
                 public void actionPerformed(ActionEvent ae) {
-                    // 여기에다가 init 로직 추가
+                    gitInitFile();
                 }
             });
             toolBar.add(gitInitFile);
@@ -640,6 +640,40 @@ public class FileManager {
             }
         }
         gui.repaint();
+    }
+
+    private void gitInitFile(){ // git init 명령어을 실행하는 함수
+        if (currentFile == null) {
+            showErrorMessage("No location selected for new file.", "Select Location");
+            return;
+        }
+
+        try {
+            File[] files = currentFile.listFiles();
+            for (File file : files) {
+                if (file.getName().equals(".git")) { // 현재 디렉토리에 .git이 존재하는지 판정
+                    showErrorMessage("이 directory는 이미 git Repository입니다.", "Select Location");
+                    return;
+                }
+            }
+
+            int result = JOptionPane.showConfirmDialog(gui, "이 directory를 Git Repository로 등록하시겠습니까? '예'를 누르면 등록됩니다.", "git init", JOptionPane.ERROR_MESSAGE);
+            // git init을 진짜 실행할건지 묻는 메시지 창
+            if (result == JOptionPane.OK_OPTION) { // "예" 클릭 시
+                String[] command = {"git", "init"};
+                ProcessBuilder processBuilder = new ProcessBuilder(command);
+                processBuilder.directory(currentFile);
+                Process process = processBuilder.start();
+                BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream()));
+                String line;
+                while ((line = reader.readLine()) != null) {
+                    System.out.println(line);
+                }
+                int exitCode = process.waitFor();
+            }
+        } catch (IOException | InterruptedException e) {
+            e.printStackTrace();
+        }
     }
 
     private void showErrorMessage(String errorMessage, String errorTitle) {
