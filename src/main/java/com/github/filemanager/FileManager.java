@@ -702,44 +702,47 @@ public class FileManager {
          * 따라서, git status를 통해 선택한 파일이 git repository에 있는지 확인 후 add 실행.
          * git status는 parent directory까지 자동으로 탐색하므로 번거로운 일이 줄어들 것으로 예상.
          * 후에 필요할 시, 별도의 boolean 함수로 전환할 예정.
+         * 파일을 직접 선택할 경우, processBuilder.directory()의 인자에는 Directory가 들어가야 하므로
+         * currentFile.getparentFile() 을 통해, 파일이 존재하는 경로를 반환해야 함.
          */
 
-        String[] checkGitCommand = {"git", "status"}; //Git status 명령어를 통해 간접적으로 .git 폴더 유무 확인
-        ProcessBuilder pb = new ProcessBuilder(checkGitCommand);
-        pb.directory(currentFile.getParentFile()); //선택한 파일의 경로 반환
-        int status = -1;
+        String[] gitCheckCommand = {"git", "status"}; //Git status 명령어를 통해 간접적으로 .git 폴더 유무 확인
+        ProcessBuilder processBuilder = new ProcessBuilder(gitCheckCommand);
+        processBuilder.directory(currentFile.getParentFile()); //선택한 파일의 경로 반환
+        Process process;
+        int gitStatus = -1;
+
         try{
-            Process pc = pb.start(); //git status 명령어를 선택한 파일의 경로에서 실행하여 git이 있는지 확인
-            status = pc.waitFor(); //만일 git status가 잘 실행됐다면 git repository에 있다는 것이고, 아니라면 에러코드를 반환
-            System.out.println(status);
+            process = processBuilder.start(); //git status 명령어를 선택한 파일의 경로에서 실행하여 git이 있는지 확인
+            gitStatus = process.waitFor(); //만일 git status가 잘 실행됐다면 git repository에 있다는 것이고, 아니라면 에러코드를 반환
+            System.out.println(gitStatus);
         }catch (IOException | InterruptedException e){
             e.printStackTrace();
         }
 
-
-        if (status == 0) { //현재 디렉토리에 .git이 있는 경우에만 add 실행가능하게 함.
+        if (gitStatus == 0) { //현재 디렉토리에 .git이 있는 경우에만 add 실행가능하게 함.
             try{
                 int result = JOptionPane.showConfirmDialog(gui, "해당 파일을 stage 하시겠습니까? '예'를 누르면 등록됩니다.", "git add", JOptionPane.ERROR_MESSAGE);
-                if (result == JOptionPane.OK_OPTION) { // "예" 클릭 시 git add 명령어 실행
-                    String[] command = {"git", "add", currentFile.getAbsolutePath()};
-                    ProcessBuilder processBuilder = new ProcessBuilder(command);
-                    processBuilder.directory(currentFile.getParentFile());
-                    Process process = processBuilder.start();
 
-                    status = process.waitFor();
-                    if (status == 0){ // git add 명령어가 정상적으로 실행되어 status가 0일 경우
+                if (result == JOptionPane.OK_OPTION) { // "예" 클릭 시 git add 명령어 실행
+                    String[] gitAddCommand = {"git", "add", currentFile.getAbsolutePath()};
+                    processBuilder = new ProcessBuilder(gitAddCommand);
+                    processBuilder.directory(currentFile.getParentFile());
+                    process = processBuilder.start();
+                    gitStatus = process.waitFor();
+
+                    if (gitStatus == 0){ // git add 명령어가 정상적으로 실행되어 status가 0일 경우
                         JOptionPane.showMessageDialog(gui, "성공적으로 파일을 stage 했습니다.");
                         System.out.println(currentFile);
                         System.out.println("staged");
-                    }else{
+                    }else{ //git add 명령어가 정상적으로 실행되지 않았을 경우
                         showErrorMessage("파일을 Stage하는 과정에서 오류가 발생했습니다.","git add error");
                     }
                 }
             } catch (InterruptedException | IOException e){
                 e.printStackTrace();
             }
-
-        }else{
+        }else{ //.git이 존재하지 않는 경우 (git status 명령어가 실패했을 경우)
             showErrorMessage("선택한 파일은 git repository에 존재하지 않습니다.","git Add error");
         }
     }
