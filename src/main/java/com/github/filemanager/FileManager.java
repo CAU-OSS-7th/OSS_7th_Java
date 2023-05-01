@@ -642,7 +642,7 @@ public class FileManager {
         gui.repaint();
     }
 
-    private boolean isInGitRepository(){ // 현재 directory가 git repository인지 판정하는 함수, 이 조건을 충족한 뒤 git 명령어를 실행하는 로직을 추가하도록 한다.
+    private boolean isInGitRepository() { // 현재 directory가 git repository인지 판정하는 함수, 이 조건을 충족한 뒤 git 명령어를 실행해야 한다.
         if (currentFile == null) {
             showErrorMessage("No location selected for new file.", "Select Location");
             return false;
@@ -657,7 +657,7 @@ public class FileManager {
         return false;
     }
 
-    private void gitInitFile(){ // git init 명령어을 실행하는 함수
+    private void gitInitFile() { // git init 명령어을 실행하는 함수
         if (currentFile == null) {
             showErrorMessage("No location selected for new file.", "Select Location");
             return;
