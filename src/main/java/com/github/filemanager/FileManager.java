@@ -23,14 +23,7 @@ SOFTWARE.
  */
 package com.github.filemanager;
 
-import java.awt.BorderLayout;
-import java.awt.Component;
-import java.awt.Container;
-import java.awt.Desktop;
-import java.awt.Dimension;
-import java.awt.FlowLayout;
-import java.awt.GridLayout;
-import java.awt.Image;
+import java.awt.*;
 import java.awt.event.*;
 import java.awt.image.*;
 import java.io.*;
@@ -39,6 +32,7 @@ import java.nio.channels.FileChannel;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
+import java.util.Set;
 import javax.imageio.ImageIO;
 import javax.swing.*;
 import javax.swing.border.*;
@@ -48,6 +42,11 @@ import javax.swing.table.*;
 import javax.swing.tree.*;
 
 import org.apache.commons.io.FileUtils;
+import org.eclipse.jgit.api.Git;
+import org.eclipse.jgit.api.Status;
+import org.eclipse.jgit.api.errors.GitAPIException;
+import org.eclipse.jgit.lib.Repository;
+import org.eclipse.jgit.storage.file.FileRepositoryBuilder;
 
 /**
  * A basic File Manager. Requires 1.6+ for the Desktop &amp; SwingWorker classes, amongst other
@@ -158,6 +157,10 @@ public class FileManager {
     private JPanel newFilePanel;
     private JRadioButton newTypeFile;
     private JTextField name;
+
+    /* git commit을 눌렀을 때 나오는 새 창을 위한 GUI options/containers */
+    private JPanel gitCommitPanel;
+    private JTextField gitCommitMessage;
 
     public Container getGui() {
         if (gui == null) {
@@ -386,7 +389,7 @@ public class FileManager {
             gitCommitFile.setMnemonic('C');
             gitCommitFile.addActionListener(new ActionListener() {
                 public void actionPerformed(ActionEvent ae) {
-                    // 여기에다가 commit 로직 추가
+                    gitCommitFile();
                 }
             });
             toolBar.add(gitCommitFile);
@@ -759,6 +762,45 @@ public class FileManager {
         }
     }
 
+
+
+
+    private void gitCommitFile() { //git commit 로직
+        JTextField textField;
+        JTable commitTable;
+        JLabel commitLabel;
+        JScrollPane commitScrollPane;
+
+
+
+        if (gitCommitPanel == null) {
+            String[] columns = {"Icon", "File", "Path/name"};
+            Object[][] data = {{"1", "2", "3"}, {"4", "5", "6"}, {"7", "8", "9"}};
+            commitTable = new JTable(data, columns);
+
+            // JTextField 생성
+            JPanel commitPanel = new JPanel(new BorderLayout());
+            commitLabel = new JLabel("Commit Message:");
+            textField = new JTextField(3);
+            commitPanel.add(commitLabel,BorderLayout.NORTH);
+            commitPanel.add(textField, BorderLayout.SOUTH);
+
+
+            commitScrollPane = new JScrollPane(commitTable);
+            commitScrollPane.setPreferredSize(new Dimension(700,200));
+
+
+            // 팝업 대화상자에 JTable, JTextField, JButton 배치
+            JPanel panel = new JPanel(new BorderLayout());
+            panel.add(commitScrollPane, BorderLayout.NORTH);
+            panel.add(commitPanel, BorderLayout.CENTER);
+
+            // JOptionPane.showConfirmDialog()를 사용하여 팝업 대화상자 생성
+            Object[] choices = {"취소", "커밋"};
+            Object defaultChoice = choices[1];
+            int optionPane = JOptionPane.showOptionDialog(gui, panel, "Git Commit", JOptionPane.OK_CANCEL_OPTION,JOptionPane.QUESTION_MESSAGE,null,choices,defaultChoice);
+        }
+    }
 
     private void showErrorMessage(String errorMessage, String errorTitle) {
         JOptionPane.showMessageDialog(gui, errorMessage, errorTitle, JOptionPane.ERROR_MESSAGE);
