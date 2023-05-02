@@ -691,6 +691,32 @@ public class FileManager {
         }
     }
 
+    /**
+     * 위의 isInGitRepostiroy()의 경우 단일 파일 선택 시 NullPointerException이 발생하므로 git status 명령어 실행을 통한
+     * .git 존재 여부를 판단하는 새로운 isFileInGitRepository() 함수 선언
+     */
+
+    private boolean isFileInGitRepository(){
+        String[] gitCheckCommand = {"git", "status"}; //Git status 명령어를 통해 간접적으로 .git 폴더 유무 확인
+        ProcessBuilder processBuilder = new ProcessBuilder(gitCheckCommand);
+        processBuilder.directory(currentFile.getParentFile()); //선택한 파일의 경로 반환
+        Process process;
+        int gitStatus = -1;
+
+        try{
+            process = processBuilder.start(); //git status 명령어를 선택한 파일의 경로에서 실행하여 git이 있는지 확인
+            gitStatus = process.waitFor(); //만일 git status가 잘 실행됐다면 git repository에 있다는 것이고, 아니라면 에러코드를 반환
+            if (gitStatus == 0){
+                return true;
+            }else{
+                return false;
+            }
+        }catch (IOException | InterruptedException e){
+            e.printStackTrace();
+        }
+        return false;
+    }
+
     private void gitAddFile() { //선택한 파일을 stage하는 git add로직. "git add" 버튼을 누르면 이 로직이 실행된다.
         if (currentFile == null) {
             showErrorMessage("No location selected for new file.", "Select Location");
@@ -701,37 +727,23 @@ public class FileManager {
          * 파일을 선택할 경우, directory가 아니므로 기존 isInGitRepository() 실행 시 Not a directory Error 발생.
          * 따라서, git status를 통해 선택한 파일이 git repository에 있는지 확인 후 add 실행.
          * git status는 parent directory까지 자동으로 탐색하므로 번거로운 일이 줄어들 것으로 예상.
-         * 후에 필요할 시, 별도의 boolean 함수로 전환할 예정.
+         * 후에 필요할 시, 별도의 boolean 함수로 전환할 예정. => isFileInGitRepository로 함수화 완료. (5/2)
          * 파일을 직접 선택할 경우, processBuilder.directory()의 인자에는 Directory가 들어가야 하므로
          * currentFile.getparentFile() 을 통해, 파일이 존재하는 경로를 반환해야 함.
          */
 
-        String[] gitCheckCommand = {"git", "status"}; //Git status 명령어를 통해 간접적으로 .git 폴더 유무 확인
-        ProcessBuilder processBuilder = new ProcessBuilder(gitCheckCommand);
-        processBuilder.directory(currentFile.getParentFile()); //선택한 파일의 경로 반환
-        Process process;
-        int gitStatus = -1;
-
-        try{
-            process = processBuilder.start(); //git status 명령어를 선택한 파일의 경로에서 실행하여 git이 있는지 확인
-            gitStatus = process.waitFor(); //만일 git status가 잘 실행됐다면 git repository에 있다는 것이고, 아니라면 에러코드를 반환
-            System.out.println(gitStatus);
-        }catch (IOException | InterruptedException e){
-            e.printStackTrace();
-        }
-
-        if (gitStatus == 0) { //현재 디렉토리에 .git이 있는 경우에만 add 실행가능하게 함.
+        if (isFileInGitRepository()) { //현재 디렉토리에 .git이 있는 경우에만 add 실행가능하게 함.
             try{
                 int result = JOptionPane.showConfirmDialog(gui, "해당 파일을 stage 하시겠습니까? '예'를 누르면 등록됩니다.", "git add", JOptionPane.ERROR_MESSAGE);
 
                 if (result == JOptionPane.OK_OPTION) { // "예" 클릭 시 git add 명령어 실행
                     String[] gitAddCommand = {"git", "add", currentFile.getAbsolutePath()};
-                    processBuilder = new ProcessBuilder(gitAddCommand);
+                    ProcessBuilder processBuilder = new ProcessBuilder(gitAddCommand);
                     processBuilder.directory(currentFile.getParentFile());
-                    process = processBuilder.start();
-                    gitStatus = process.waitFor();
+                    Process process = processBuilder.start();
+                    int addStatus = process.waitFor(); //git add 명령어 정상 실행 여부
 
-                    if (gitStatus == 0){ // git add 명령어가 정상적으로 실행되어 status가 0일 경우
+                    if (addStatus == 0){ // git add 명령어가 정상적으로 실행되어 status가 0일 경우
                         JOptionPane.showMessageDialog(gui, "성공적으로 파일을 stage 했습니다.");
                         System.out.println(currentFile);
                         System.out.println("staged");
