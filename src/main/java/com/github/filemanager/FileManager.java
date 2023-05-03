@@ -23,14 +23,7 @@ SOFTWARE.
  */
 package com.github.filemanager;
 
-import java.awt.BorderLayout;
-import java.awt.Component;
-import java.awt.Container;
-import java.awt.Desktop;
-import java.awt.Dimension;
-import java.awt.FlowLayout;
-import java.awt.GridLayout;
-import java.awt.Image;
+import java.awt.*;
 import java.awt.event.*;
 import java.io.*;
 import java.net.URL;
@@ -38,6 +31,7 @@ import java.nio.channels.FileChannel;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
+import java.util.Set;
 import javax.imageio.ImageIO;
 import javax.swing.*;
 import javax.swing.border.*;
@@ -47,6 +41,11 @@ import javax.swing.table.*;
 import javax.swing.tree.*;
 
 import org.apache.commons.io.FileUtils;
+import org.eclipse.jgit.api.Git;
+import org.eclipse.jgit.api.Status;
+import org.eclipse.jgit.api.errors.GitAPIException;
+import org.eclipse.jgit.lib.Repository;
+import org.eclipse.jgit.storage.file.FileRepositoryBuilder;
 
 /**
  * A basic File Manager. Requires 1.6+ for the Desktop &amp; SwingWorker classes, amongst other
@@ -156,6 +155,10 @@ public class FileManager {
     private JPanel newFilePanel;
     private JRadioButton newTypeFile;
     private JTextField name;
+
+    /* git commit을 눌렀을 때 나오는 새 창을 위한 GUI options/containers */
+    private JPanel gitCommitPanel;
+    private JTextField gitCommitMessage;
 
     public Container getGui() {
         if (gui == null) {
@@ -374,7 +377,7 @@ public class FileManager {
             gitAddFile.setMnemonic('A');
             gitAddFile.addActionListener(new ActionListener() {
                 public void actionPerformed(ActionEvent ae) {
-                    // 여기에다가 add 로직 추가
+                    gitAddFile();
                 }
             });
             toolBar.add(gitAddFile);
@@ -384,7 +387,7 @@ public class FileManager {
             gitCommitFile.setMnemonic('C');
             gitCommitFile.addActionListener(new ActionListener() {
                 public void actionPerformed(ActionEvent ae) {
-                    // 여기에다가 commit 로직 추가
+                    gitCommitFile();
                 }
             });
             toolBar.add(gitCommitFile);
@@ -640,6 +643,11 @@ public class FileManager {
         gui.repaint();
     }
 
+    /**
+     * 5/3 Bug Report
+     * 밑의 isInGitRepository() 함수를 사용하는 경우 단일 파일 선택 후 버튼 클릭 시 (git init, git add 등), 오류가 발생하는 것 같아 대체가 필요해보입니다.
+     */
+
     private boolean isInGitRepository() { // 현재 directory가 git repository인지 판정하는 함수, 이 조건을 충족한 뒤 git 명령어를 실행해야 한다.
         if (currentFile == null) {
             showErrorMessage("No location selected for new file.", "Select Location");
@@ -686,6 +694,181 @@ public class FileManager {
             }
         } catch (IOException | InterruptedException e) {
             e.printStackTrace();
+        }
+    }
+
+    /**
+     * 위의 isInGitRepostiroy()의 경우 단일 파일 선택 시 NullPointerException이 발생하므로 git status 명령어 실행을 통한
+     * .git 존재 여부를 판단하는 새로운 isFileInGitRepository() 함수 선언
+     */
+
+
+     /** 5/3 Bug Report
+     * 밑의 isFileInGitRepository() 함수로 대체하면 예외처리 발생을 막는 것 같습니다.
+     * 후의 기능 git rm, git rm --cached 등의 기능에서도 아래의 함수를 사용하면 될 듯 싶음.
+     */
+
+    private boolean isFileInGitRepository(){
+        String[] gitCheckCommand = {"git", "status"}; //Git status 명령어를 통해 간접적으로 .git 폴더 유무 확인
+        ProcessBuilder processBuilder = new ProcessBuilder(gitCheckCommand);
+        processBuilder.directory(currentFile.getParentFile()); //선택한 파일의 경로 반환
+        Process process;
+        int gitStatus = -1;
+
+        try{
+            process = processBuilder.start(); //git status 명령어를 선택한 파일의 경로에서 실행하여 git이 있는지 확인
+            gitStatus = process.waitFor(); //만일 git status가 잘 실행됐다면 git repository에 있다는 것이고, 아니라면 에러코드를 반환
+            if (gitStatus == 0){
+                return true;
+            }else{
+                return false;
+            }
+        }catch (IOException | InterruptedException e){
+            e.printStackTrace();
+        }
+        return false;
+    }
+
+    private void gitAddFile() { //선택한 파일을 stage하는 git add로직. "git add" 버튼을 누르면 이 로직이 실행된다.
+        if (currentFile == null) {
+            showErrorMessage("No location selected for new file.", "Select Location");
+            return;
+        }
+
+        /** ----------------------------------------확인 바람------------------------------------------
+         * 파일을 선택할 경우, directory가 아니므로 기존 isInGitRepository() 실행 시 Not a directory Error 발생.
+         * 따라서, git status를 통해 선택한 파일이 git repository에 있는지 확인 후 add 실행.
+         * git status는 parent directory까지 자동으로 탐색하므로 번거로운 일이 줄어들 것으로 예상.
+         * 후에 필요할 시, 별도의 boolean 함수로 전환할 예정. => isFileInGitRepository로 함수화 완료. (5/2)
+         * 파일을 직접 선택할 경우, processBuilder.directory()의 인자에는 Directory가 들어가야 하므로
+         * currentFile.getparentFile() 을 통해, 파일이 존재하는 경로를 반환해야 함.
+         */
+
+        if (isFileInGitRepository()) { //현재 디렉토리에 .git이 있는 경우에만 add 실행가능하게 함.
+            try{
+                int result = JOptionPane.showConfirmDialog(gui, "해당 파일을 stage 하시겠습니까? '예'를 누르면 등록됩니다.", "git add", JOptionPane.ERROR_MESSAGE);
+
+                if (result == JOptionPane.OK_OPTION) { // "예" 클릭 시 git add 명령어 실행
+                    String[] gitAddCommand = {"git", "add", currentFile.getAbsolutePath()};
+                    ProcessBuilder processBuilder = new ProcessBuilder(gitAddCommand);
+                    processBuilder.directory(currentFile.getParentFile());
+                    Process process = processBuilder.start();
+                    int addStatus = process.waitFor(); //git add 명령어 정상 실행 여부
+
+                    if (addStatus == 0){ // git add 명령어가 정상적으로 실행되어 status가 0일 경우
+                        JOptionPane.showMessageDialog(gui, "성공적으로 파일을 stage 했습니다.");
+                        System.out.println(currentFile);
+                        System.out.println("staged");
+                    }else{ //git add 명령어가 정상적으로 실행되지 않았을 경우
+                        showErrorMessage("파일을 Stage하는 과정에서 오류가 발생했습니다.","git add error");
+                    }
+                }
+            } catch (InterruptedException | IOException e){
+                e.printStackTrace();
+            }
+        }else{ //.git이 존재하지 않는 경우 (git status 명령어가 실패했을 경우)
+            showErrorMessage("선택한 파일은 git repository에 존재하지 않습니다.","git Add error");
+        }
+    }
+
+    /**
+     * 커밋 창을 띄울 때, 테이블에 stage된 파일을 출력하기 위해서 Git repository를 접근해야 함.
+     * Jgit을 통해 git repository를 연 후, 스테이지 된 파일을 가져오는 함수 getStagedFile() 선언
+     */
+
+    private Object[][] getStagedFile(File curFile) throws IOException, GitAPIException {
+        Git git = Git.open(curFile); // 현재 파일 기준으로 git 레퍼지토리 열기
+
+        // Stage된 파일 목록 가져오기
+        Status status = git.status().call();
+        Set<String> staged = status.getAdded();
+
+        // 테이블 데이터로 변환하기
+        Object[][] data = new Object[staged.size()][2];
+        int i = 0;
+        for (String fileName : staged) {
+            String fileStatus = "Staged";
+            data[i] = new Object[]{fileName, fileStatus};
+            i++;
+        }
+        return data;
+    }
+
+
+    private void gitCommitFile() { //git commit 로직
+        JTextField textField;
+        JTable commitTable;
+        JLabel commitLabel;
+        JScrollPane commitScrollPane;
+
+        if (currentFile == null) { //선택한 파일이 없으면 에러 메시지
+            showErrorMessage("선택한 파일이 없어 경로를 읽지 못했습니다.", "Select File");
+            return;
+        }
+
+        if (isFileInGitRepository()){ //.git이 존재할 경우
+            if (gitCommitPanel == null) {
+                try{
+                    /*-------------------------------커밋 창 UI 구성--------------------------------- */
+
+                    String[] columns = {"File", "File Status"};
+                    Object[][] data = getStagedFile(currentFile.getParentFile()); //stage된 데이터 오브젝트
+                    commitTable = new JTable(data, columns);
+
+                    // JTextField 생성
+                    JPanel commitPanel = new JPanel(new BorderLayout());
+                    commitLabel = new JLabel("Commit Message:");
+                    textField = new JTextField(2);
+                    commitPanel.add(commitLabel,BorderLayout.NORTH);
+                    commitPanel.add(textField, BorderLayout.SOUTH);
+
+
+                    commitScrollPane = new JScrollPane(commitTable);
+                    commitScrollPane.setPreferredSize(new Dimension(700,200));
+
+                    // 커밋 창 구성
+                    JPanel panel = new JPanel(new BorderLayout());
+                    panel.add(commitScrollPane, BorderLayout.NORTH);
+                    panel.add(commitPanel, BorderLayout.CENTER);
+
+                   // 커밋 창 확인 취소 버튼을 "커밋", "취소" 버튼으로 커스터 마이징
+                    Object[] choices = {"커밋", "취소"};
+                    Object defaultChoice = choices[0];
+                /*---------------------------------------------------------------------------*/
+
+                    if (data.length == 0){ //Stage된 파일이 없을 경우 커밋 창 띄우지 말아야 함
+                        showErrorMessage("Stage된 파일이 없습니다.", "No Staged File");
+                        return;
+                    }
+                    //커밋 창 띄우기
+                    int optionPane = JOptionPane.showOptionDialog(gui, panel, "Git Commit", JOptionPane.OK_CANCEL_OPTION,JOptionPane.QUESTION_MESSAGE,null,choices,defaultChoice);
+
+                    //git commit -m 명령어 실행
+                    if (optionPane == JOptionPane.OK_OPTION){ //커밋 버튼을 눌렀을 경우
+                        if (textField.getText().isEmpty()){ //커밋 메시지를 입력하지 않았을 경우 에러 메시지 출력
+                            showErrorMessage("커밋 메시지를 입력해주세요.","Empty commit message");
+                        }else{
+                            String[] gitCommitCommand = {"git", "commit","-m", textField.getText()};
+                            ProcessBuilder processBuilder = new ProcessBuilder(gitCommitCommand);
+                            processBuilder.directory(currentFile.getParentFile());
+                            Process process = processBuilder.start();
+                            int commitStatus = process.waitFor(); //git commit 명령어 정상 실행 여부
+
+                            if (commitStatus == 0){ // git commit 명령어가 정상적으로 실행되어 status가 0일 경우
+                                JOptionPane.showMessageDialog(gui, "성공적으로 파일을 커밋 했습니다.");
+                                System.out.println(currentFile);
+                                System.out.println("Committed");
+                            }else{ //git commit 명령어가 정상적으로 실행되지 않았을 경우
+                                showErrorMessage("파일을 Commit하는 과정에서 오류가 발생했습니다.","git commit error");
+                            }
+                        }
+                    }
+                }catch (GitAPIException | InterruptedException | IOException e){
+                    e.printStackTrace();
+                }
+            }
+        }else{ //.git이 존재하지 않을 경우
+            showErrorMessage("선택한 파일은 git repository에 존재하지 않습니다.","git Commit error");
         }
     }
 
