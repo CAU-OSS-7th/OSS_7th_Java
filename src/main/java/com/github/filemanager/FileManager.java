@@ -762,7 +762,28 @@ public class FileManager {
         }
     }
 
+    /**
+     * 커밋 창을 띄울 때, 테이블에 stage된 파일을 출력하기 위해서 Git repository를 접근해야 함.
+     * Jgit을 통해 git repository를 연 후, 스테이지 된 파일을 가져오는 함수 getStagedFile() 선언
+     */
 
+    private Object[][] getStagedFile(File curFile) throws IOException, GitAPIException {
+        Git git = Git.open(curFile); // 현재 파일 기준으로 git 레퍼지토리 열기
+
+        // Stage된 파일 목록 가져오기
+        Status status = git.status().call();
+        Set<String> staged = status.getAdded();
+
+        // 테이블 데이터로 변환하기
+        Object[][] data = new Object[staged.size()][2];
+        int i = 0;
+        for (String fileName : staged) {
+            String fileStatus = "Staged";
+            data[i] = new Object[]{fileName, fileStatus};
+            i++;
+        }
+        return data;
+    }
 
 
     private void gitCommitFile() { //git commit 로직
@@ -771,34 +792,70 @@ public class FileManager {
         JLabel commitLabel;
         JScrollPane commitScrollPane;
 
+        if (currentFile == null) { //선택한 파일이 없으면 에러 메시지
+            showErrorMessage("선택한 파일이 없어 경로를 읽지 못했습니다.", "Select File");
+            return;
+        }
+
+        if (isFileInGitRepository()){ //.git이 존재할 경우
+            if (gitCommitPanel == null) {
+                try{
+                    String[] columns = {"File", "File Status"};
+                    Object[][] data = getStagedFile(currentFile.getParentFile()); //stage된 데이터 오브젝트
+                    commitTable = new JTable(data, columns);
+
+                    // JTextField 생성
+                    JPanel commitPanel = new JPanel(new BorderLayout());
+                    commitLabel = new JLabel("Commit Message:");
+                    textField = new JTextField(2);
+                    commitPanel.add(commitLabel,BorderLayout.NORTH);
+                    commitPanel.add(textField, BorderLayout.SOUTH);
 
 
-        if (gitCommitPanel == null) {
-            String[] columns = {"Icon", "File", "Path/name"};
-            Object[][] data = {{"1", "2", "3"}, {"4", "5", "6"}, {"7", "8", "9"}};
-            commitTable = new JTable(data, columns);
+                    commitScrollPane = new JScrollPane(commitTable);
+                    commitScrollPane.setPreferredSize(new Dimension(700,200));
 
-            // JTextField 생성
-            JPanel commitPanel = new JPanel(new BorderLayout());
-            commitLabel = new JLabel("Commit Message:");
-            textField = new JTextField(3);
-            commitPanel.add(commitLabel,BorderLayout.NORTH);
-            commitPanel.add(textField, BorderLayout.SOUTH);
+                    // 커밋 창 구성
+                    JPanel panel = new JPanel(new BorderLayout());
+                    panel.add(commitScrollPane, BorderLayout.NORTH);
+                    panel.add(commitPanel, BorderLayout.CENTER);
 
+                   // 커밋 창 확인 취소 버튼을 "커밋", "취소" 버튼으로 커스터 마이징
+                    Object[] choices = {"커밋", "취소"};
+                    Object defaultChoice = choices[0];
 
-            commitScrollPane = new JScrollPane(commitTable);
-            commitScrollPane.setPreferredSize(new Dimension(700,200));
+                    if (data.length == 0){ //Stage된 파일이 없을 경우 커밋 창 띄우지 말아야 함
+                        showErrorMessage("Stage된 파일이 없습니다.", "No Staged File");
+                        return;
+                    }
+                    //커밋 창 띄우기
+                    int optionPane = JOptionPane.showOptionDialog(gui, panel, "Git Commit", JOptionPane.OK_CANCEL_OPTION,JOptionPane.QUESTION_MESSAGE,null,choices,defaultChoice);
 
+                    if (optionPane == JOptionPane.OK_OPTION){ //커밋 버튼을 눌렀을 경우
+                        if (textField.getText().isEmpty()){ //커밋 메시지를 입력하지 않았을 경우 에러 메시지 출력
+                            showErrorMessage("커밋 메시지를 입력해주세요.","Empty commit message");
+                        }else{
+                            String[] gitCommitCommand = {"git", "commit","-m", textField.getText()};
+                            ProcessBuilder processBuilder = new ProcessBuilder(gitCommitCommand);
+                            processBuilder.directory(currentFile.getParentFile());
+                            Process process = processBuilder.start();
+                            int commitStatus = process.waitFor(); //git commit 명령어 정상 실행 여부
 
-            // 팝업 대화상자에 JTable, JTextField, JButton 배치
-            JPanel panel = new JPanel(new BorderLayout());
-            panel.add(commitScrollPane, BorderLayout.NORTH);
-            panel.add(commitPanel, BorderLayout.CENTER);
-
-            // JOptionPane.showConfirmDialog()를 사용하여 팝업 대화상자 생성
-            Object[] choices = {"취소", "커밋"};
-            Object defaultChoice = choices[1];
-            int optionPane = JOptionPane.showOptionDialog(gui, panel, "Git Commit", JOptionPane.OK_CANCEL_OPTION,JOptionPane.QUESTION_MESSAGE,null,choices,defaultChoice);
+                            if (commitStatus == 0){ // git commit 명령어가 정상적으로 실행되어 status가 0일 경우
+                                JOptionPane.showMessageDialog(gui, "성공적으로 파일을 커밋 했습니다.");
+                                System.out.println(currentFile);
+                                System.out.println("Committed");
+                            }else{ //git commit 명령어가 정상적으로 실행되지 않았을 경우
+                                showErrorMessage("파일을 Commit하는 과정에서 오류가 발생했습니다.","git commit error");
+                            }
+                        }
+                    }
+                }catch (GitAPIException | InterruptedException | IOException e){
+                    e.printStackTrace();
+                }
+            }
+        }else{ //.git이 존재하지 않을 경우
+            showErrorMessage("선택한 파일은 git repository에 존재하지 않습니다.","git Commit error");
         }
     }
 
