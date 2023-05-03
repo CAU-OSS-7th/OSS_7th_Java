@@ -645,6 +645,11 @@ public class FileManager {
         gui.repaint();
     }
 
+    /**
+     * 5/3 Bug Report
+     * 밑의 isInGitRepository() 함수를 사용하는 경우 단일 파일 선택 후 버튼 클릭 시 (git init, git add 등), 오류가 발생하는 것 같아 대체가 필요해보입니다.
+     */
+
     private boolean isInGitRepository() { // 현재 directory가 git repository인지 판정하는 함수, 이 조건을 충족한 뒤 git 명령어를 실행해야 한다.
         if (currentFile == null) {
             showErrorMessage("No location selected for new file.", "Select Location");
@@ -697,6 +702,12 @@ public class FileManager {
     /**
      * 위의 isInGitRepostiroy()의 경우 단일 파일 선택 시 NullPointerException이 발생하므로 git status 명령어 실행을 통한
      * .git 존재 여부를 판단하는 새로운 isFileInGitRepository() 함수 선언
+     */
+
+
+     /** 5/3 Bug Report
+     * 밑의 isFileInGitRepository() 함수로 대체하면 예외처리 발생을 막는 것 같습니다.
+     * 후의 기능 git rm, git rm --cached 등의 기능에서도 아래의 함수를 사용하면 될 듯 싶음.
      */
 
     private boolean isFileInGitRepository(){
@@ -800,6 +811,8 @@ public class FileManager {
         if (isFileInGitRepository()){ //.git이 존재할 경우
             if (gitCommitPanel == null) {
                 try{
+                    /*-------------------------------커밋 창 UI 구성--------------------------------- */
+
                     String[] columns = {"File", "File Status"};
                     Object[][] data = getStagedFile(currentFile.getParentFile()); //stage된 데이터 오브젝트
                     commitTable = new JTable(data, columns);
@@ -823,6 +836,7 @@ public class FileManager {
                    // 커밋 창 확인 취소 버튼을 "커밋", "취소" 버튼으로 커스터 마이징
                     Object[] choices = {"커밋", "취소"};
                     Object defaultChoice = choices[0];
+                /*---------------------------------------------------------------------------*/
 
                     if (data.length == 0){ //Stage된 파일이 없을 경우 커밋 창 띄우지 말아야 함
                         showErrorMessage("Stage된 파일이 없습니다.", "No Staged File");
@@ -831,6 +845,7 @@ public class FileManager {
                     //커밋 창 띄우기
                     int optionPane = JOptionPane.showOptionDialog(gui, panel, "Git Commit", JOptionPane.OK_CANCEL_OPTION,JOptionPane.QUESTION_MESSAGE,null,choices,defaultChoice);
 
+                    //git commit -m 명령어 실행
                     if (optionPane == JOptionPane.OK_OPTION){ //커밋 버튼을 눌렀을 경우
                         if (textField.getText().isEmpty()){ //커밋 메시지를 입력하지 않았을 경우 에러 메시지 출력
                             showErrorMessage("커밋 메시지를 입력해주세요.","Empty commit message");
