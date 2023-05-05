@@ -162,6 +162,9 @@ public class FileManager {
     private JPanel gitCommitPanel;
     private JTextField gitCommitMessage;
 
+    /* List에서 File을 선택했는지 Tree에서 File을 선택헀는지 분간하기 위한 변수. True일 경우에만 git 버튼이 활성화된다.*/
+    private boolean isFileSelectedInList = false;
+
     public Container getGui() {
         if (gui == null) {
             gui = new JPanel(new BorderLayout(3, 3));
@@ -183,6 +186,7 @@ public class FileManager {
                 public void valueChanged(ListSelectionEvent lse) {
                     int row = table.getSelectionModel().getLeadSelectionIndex();
                     setFileDetails(((FileTableModel) table.getModel()).getFile(row));
+                    isFileSelectedInList = true; //리스트에서 파일을 선택했으므로 true
                 }
             };
             table.getSelectionModel().addListSelectionListener(listSelectionListener);
@@ -200,6 +204,7 @@ public class FileManager {
                     DefaultMutableTreeNode node = (DefaultMutableTreeNode) tse.getPath().getLastPathComponent();
                     showChildren(node);
                     setFileDetails((File) node.getUserObject());
+                    isFileSelectedInList = false; //리스트가 아닌 트리에서 파일을 선택했으므로 false. 이때는 git 버튼이 비활성화된다.
                 }
             };
 
@@ -732,8 +737,8 @@ public class FileManager {
     }
 
     private void gitAddFile() { //선택한 파일을 stage하는 git add로직. "git add" 버튼을 누르면 이 로직이 실행된다.
-        if (currentFile == null) {
-            showErrorMessage("No location selected for new file.", "Select Location");
+        if (currentFile == null || !isFileSelectedInList) {
+            showErrorMessage("파일을 선택해주세요.", "Select File");
             return;
         }
 
@@ -803,8 +808,8 @@ public class FileManager {
         JLabel commitLabel;
         JScrollPane commitScrollPane;
 
-        if (currentFile == null) { //선택한 파일이 없으면 에러 메시지
-            showErrorMessage("선택한 파일이 없어 경로를 읽지 못했습니다.", "Select File");
+        if (currentFile == null || !isFileSelectedInList) { //선택한 파일이 없으면 에러 메시지. List가 아닌 Tree에서 파일을 선택했을 경우도 포함
+            showErrorMessage("파일을 선택해주세요.", "Select File");
             return;
         }
 
