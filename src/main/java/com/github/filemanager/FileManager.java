@@ -713,15 +713,11 @@ public class FileManager {
             return;
         }
 
+        if((isFileSelectedInList && isFileInGitRepository()) || isTreeInGitRepository()) {
+            showErrorMessage("이 파일은 이미 .git이 존재합니다.", "Already Initialized");
+            return;
+        }
         try {
-            File[] files = currentFile.listFiles();
-            for (File file : files) {
-                if (file.getName().equals(".git")) { // 현재 디렉토리에 .git이 존재하는지 판정
-                    showErrorMessage("이 directory는 이미 git Repository입니다.", "Select Location");
-                    return;
-                }
-            }
-
             int result = JOptionPane.showConfirmDialog(gui, "이 directory를 Git Repository로 등록하시겠습니까? '예'를 누르면 등록됩니다.", "git init", JOptionPane.ERROR_MESSAGE);
             // git init을 진짜 실행할건지 묻는 메시지 창
             if (result == JOptionPane.OK_OPTION) { // "예" 클릭 시 git init 명령어 실행
@@ -735,21 +731,24 @@ public class FileManager {
                     System.out.println(line);
                 }
                 int exitCode = process.waitFor();
-                if (exitCode == 0){ // git init 명령어가 정상적으로 실행되어 status가 0일 경우
+                if (exitCode == 0) { // git init 명령어가 정상적으로 실행되어 status가 0일 경우
                     JOptionPane.showMessageDialog(gui, "성공적으로 git init을 완료했습니다.");
                     System.out.println("git init");
-                    try{
-                        renderGitFileStatus(); //git init을 했을 경우, 파일에 변화가 일어났으므로 렌더링
-                    }catch (IOException | GitAPIException e){
+                    try {
+                        if (currentFile.isFile()){ //폴더를 git init했을 경우, 해당 폴더 내에서 .git이 생성되므로 렌더링 X
+                            renderGitFileStatus(); //git init을 했을 경우, 파일에 변화가 일어났으므로 렌더링
+                        }
+                    } catch (IOException | GitAPIException e) {
                         e.printStackTrace();
                     }
-                }else{ //git init 명령어가 정상적으로 실행되지 않았을 경우
-                    showErrorMessage("git init을 하는 과정에서 오류가 발생했습니다.","git init error");
+                } else { //git init 명령어가 정상적으로 실행되지 않았을 경우
+                    showErrorMessage("git init을 하는 과정에서 오류가 발생했습니다.", "git init error");
                 }
             }
-        } catch (IOException | InterruptedException e) {
+        }catch (IOException | InterruptedException e){
             e.printStackTrace();
         }
+
     }
 
 
