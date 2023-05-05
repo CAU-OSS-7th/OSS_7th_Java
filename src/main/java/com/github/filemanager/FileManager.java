@@ -336,14 +336,13 @@ public class FileManager {
                     }
                 }
             });
-            toolBar.add(printFile);
+            // toolBar.add(printFile);
 
             // Check the actions are supported on this platform!
             openFile.setEnabled(desktop.isSupported(Desktop.Action.OPEN));
             editFile.setEnabled(desktop.isSupported(Desktop.Action.EDIT));
-            printFile.setEnabled(desktop.isSupported(Desktop.Action.PRINT));
+            // printFile.setEnabled(desktop.isSupported(Desktop.Action.PRINT));
 
-            toolBar.addSeparator();
 
             newFile = new JButton("New");
             newFile.setMnemonic('n');
@@ -361,7 +360,7 @@ public class FileManager {
                     showErrorMessage("'Copy' not implemented.", "Not implemented.");
                 }
             });
-            toolBar.add(copyFile);
+            // toolBar.add(copyFile);
 
             JButton renameFile = new JButton("Rename");
             renameFile.setMnemonic('r');
@@ -370,7 +369,7 @@ public class FileManager {
                     renameFile();
                 }
             });
-            toolBar.add(renameFile);
+            // toolBar.add(renameFile);
 
             deleteFile = new JButton("Delete");
             deleteFile.setMnemonic('d');
@@ -381,6 +380,7 @@ public class FileManager {
             });
             toolBar.add(deleteFile);
 
+            toolBar.addSeparator();
             /* git 버튼 객체 생성 로직 */
 
             // 1. init 버튼
@@ -462,8 +462,6 @@ public class FileManager {
                 }
             });
             toolBar.add(gitRestoreStagedFile);
-
-            toolBar.addSeparator();
 
             readable = new JCheckBox("Read  ");
             readable.setMnemonic('a');
