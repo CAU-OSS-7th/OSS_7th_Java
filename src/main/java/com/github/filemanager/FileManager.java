@@ -789,12 +789,18 @@ public class FileManager {
         // Stage된 파일 목록 가져오기
         Status status = git.status().call();
         Set<String> staged = status.getAdded();
+        Set<String> changed = status.getChanged(); //변경사항이 stage되면 changed로 상태가 바뀌므로 따로 가져옴
 
         // 테이블 데이터로 변환하기
-        Object[][] data = new Object[staged.size()][2];
+        Object[][] data = new Object[staged.size() + changed.size()][2];
         int i = 0;
         for (String fileName : staged) {
-            String fileStatus = "Staged";
+            String fileStatus = "new file";
+            data[i] = new Object[]{fileName, fileStatus};
+            i++;
+        }
+        for (String fileName : changed) {
+            String fileStatus = "modified";
             data[i] = new Object[]{fileName, fileStatus};
             i++;
         }
@@ -805,7 +811,8 @@ public class FileManager {
     private void gitCommitFile() { //git commit 로직
         JTextField textField;
         JTable commitTable;
-        JLabel commitLabel;
+        JLabel commitMessageLabel;
+        JLabel stagedFileLabel;
         JScrollPane commitScrollPane;
 
         if (currentFile == null || !isFileSelectedInList) { //선택한 파일이 없으면 에러 메시지. List가 아닌 Tree에서 파일을 선택했을 경우도 포함
@@ -820,23 +827,29 @@ public class FileManager {
 
                     String[] columns = {"File", "File Status"};
                     Object[][] data = getStagedFile(currentFile.getParentFile()); //stage된 데이터 오브젝트
+                    JPanel commitTablePanel = new JPanel(new BorderLayout());
                     commitTable = new JTable(data, columns);
+                    stagedFileLabel = new JLabel("Changes to be committed:");
+
 
                     // JTextField 생성
-                    JPanel commitPanel = new JPanel(new BorderLayout());
-                    commitLabel = new JLabel("Commit Message:");
+                    JPanel commitMessagePanel = new JPanel(new BorderLayout());
+                    commitMessageLabel = new JLabel("Commit Message:");
                     textField = new JTextField(2);
-                    commitPanel.add(commitLabel,BorderLayout.NORTH);
-                    commitPanel.add(textField, BorderLayout.SOUTH);
+                    commitMessagePanel.add(commitMessageLabel,BorderLayout.NORTH);
+                    commitMessagePanel.add(textField, BorderLayout.SOUTH);
 
 
                     commitScrollPane = new JScrollPane(commitTable);
                     commitScrollPane.setPreferredSize(new Dimension(700,200));
 
+                    commitTablePanel.add(commitScrollPane, BorderLayout.SOUTH);
+                    commitTablePanel.add(stagedFileLabel, BorderLayout.NORTH);
+
                     // 커밋 창 구성
                     JPanel panel = new JPanel(new BorderLayout());
-                    panel.add(commitScrollPane, BorderLayout.NORTH);
-                    panel.add(commitPanel, BorderLayout.CENTER);
+                    panel.add(commitTablePanel, BorderLayout.NORTH);
+                    panel.add(commitMessagePanel, BorderLayout.SOUTH);
 
                    // 커밋 창 확인 취소 버튼을 "커밋", "취소" 버튼으로 커스터 마이징
                     Object[] choices = {"커밋", "취소"};
