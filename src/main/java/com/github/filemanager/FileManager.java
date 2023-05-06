@@ -1025,6 +1025,30 @@ public class FileManager {
         }
         return false;
     }
+
+    /**
+     * 단일 파일을 선택 했을 때 해당 파일이 Staged영역에 있는지 확인해 주는 boolean 함수
+     */
+    private boolean isStagedFile(File file){
+        try{
+            Git git;
+            git = Git.open(currentFile.getParentFile());
+            Status status = git.status().call();
+            Set<String> added = status.getAdded();
+
+            if (added.contains(file.getName())){return true;}
+            else{
+                showErrorMessage("선택한 파일이 Stage 영역에 없습니다. ", "UnStaged file chosen error");
+            }
+        }catch (IOException | GitAPIException e ){
+            e.printStackTrace();
+        }
+        return false;
+    }
+
+    /**
+     * git restore 실행로직
+    */
     private void gitRestoreFile(){ //git restore 실행 로직
         if (currentFile == null || !isFileSelectedInList) { //선택한 파일이 없으면 에러 메시지. List가 아닌 Tree에서 파일을 선택했을 경우도 포함
             showErrorMessage("파일을 선택해주세요.", "Select File");
