@@ -455,9 +455,7 @@ public class FileManager {
             gitRestoreStagedFile = new JButton("Git restore --staged");
             gitRestoreStagedFile.setMnemonic('R');
             gitRestoreStagedFile.addActionListener(new ActionListener() {
-                public void actionPerformed(ActionEvent ae) {
-                    // 여기에다가 restore --staged 로직 추가
-                }
+                public void actionPerformed(ActionEvent ae) {gitRestoreStagedFile();}
             });
             toolBar.add(gitRestoreStagedFile);
 
@@ -1014,9 +1012,10 @@ public class FileManager {
             Git git;
             git = Git.open(currentFile.getParentFile());
             Status status = git.status().call();
-            Set<String> modified = status.getModified();
 
-            if (modified.contains(file.getName())){return true;}
+            Set<String> modified = status.getModified(); // Modified 파일 이름을 받아와 비교
+
+            if (modified.contains(file.getName())){return true;} //파일 이름에 현재 파일이 있는 경우
             else{
                 showErrorMessage("선택한 파일은 Modified 상태가 아닙니다. ", "UnModified file chosen error");
             }
@@ -1034,9 +1033,11 @@ public class FileManager {
             Git git;
             git = Git.open(currentFile.getParentFile());
             Status status = git.status().call();
-            Set<String> added = status.getAdded();
+            //staged 영역에 있는 경우는 2가지 존재
+            Set<String> added = status.getAdded(); // 1. add 되고 수정이 없는 상태
+            Set<String> changed = status.getChanged(); // 2. add 되고 수정이 있는 상태
 
-            if (added.contains(file.getName())){return true;}
+            if (added.contains(file.getName()) || changed.contains(file.getName())){return true;} // stage 영역에 파일이 있으면 true 반환
             else{
                 showErrorMessage("선택한 파일이 Stage 영역에 없습니다. ", "UnStaged file chosen error");
             }
@@ -1064,13 +1065,14 @@ public class FileManager {
                         ProcessBuilder processBuilder = new ProcessBuilder(gitRestoreCommand);
                         processBuilder.directory(currentFile.getParentFile());
                         Process process = processBuilder.start();
+
                         int commitStatus = process.waitFor(); //git restore 명령어 정상 수행여부
                         if(commitStatus ==0){ // 정상수행을 의미
                             JOptionPane.showMessageDialog(gui, "복원이 성공적으로 이뤄졌습니다.");
                             System.out.println(currentFile);
                             System.out.println("Restored");
                             try{
-                                renderGitFileStatus(); //커밋했을 경우, 파일에 변화가 일어났으므로 렌더링
+                                renderGitFileStatus(); //restore 했을 경우, 파일에 변화가 일어났으므로 렌더링
                             }catch (IOException | GitAPIException e){
                                 e.printStackTrace();
                             }
@@ -1087,7 +1089,47 @@ public class FileManager {
         }
 
     }
+    /**
+     * git restore --staged 실행로직
+     */
+    private void gitRestoreStagedFile(){
+        if (currentFile == null || !isFileSelectedInList) { //선택한 파일이 없으면 에러 메시지. List가 아닌 Tree에서 파일을 선택했을 경우도 포함
+            showErrorMessage("파일을 선택해주세요.", "Select File");
+            return;
+        }
+        if(isFileInGitRepository()){ //.git 파일이 있는 경우 진행
+            try{
+                if(isStagedFile(currentFile)){ //선택한 파일이 stage 영역에 있는 경우 상태인 경우
+                    int result = JOptionPane.showConfirmDialog(gui, "해당 파일 혹은 디렉토리를 stage 영역에서 제거하시겠습니까?", "git restore --staged", JOptionPane.ERROR_MESSAGE);
+                    if(result == JOptionPane.OK_OPTION){ //restore --stage 실행 여부에서 확인을 받은 경우 git restore 명령어 수행
+                        String[] gitRestoreStagedCommand = {"git", "restore","--staged", currentFile.getName()};
+                        ProcessBuilder processBuilder = new ProcessBuilder(gitRestoreStagedCommand);
+                        processBuilder.directory(currentFile.getParentFile());
+                        Process process = processBuilder.start();
 
+                        int commitStatus = process.waitFor(); //git restore --staged 명령어 정상 수행여부
+                        if(commitStatus ==0){ // 정상수행을 의미
+                            JOptionPane.showMessageDialog(gui, "해당 파일 혹은 디렉토리가 성공적으로 Stage 영역에서 제거되었습니다.");
+                            System.out.println(currentFile);
+                            System.out.println("Restored --staged");
+                            try{
+                                renderGitFileStatus(); // restore --staged  수행 완료한 경우, 파일에 변화가 일어났으므로 렌더링
+                            }catch (IOException | GitAPIException e){
+                                e.printStackTrace();
+                            }
+                        }else{ // 정상 수행이 아닌경우
+                            showErrorMessage("Stage로 부터의 복원 과정이 정상적으로 이뤄지지 않았습니다.", "Git restore --staged error");
+                        }
+                    }else{return;} //사용자가 복원을 원치 않는 경우
+                }
+            }catch (IOException | InterruptedException e ){
+                e.printStackTrace();
+            }
+        }else{ //.git이 존재하지 않는 경우
+            showErrorMessage("선택한 파일은 .git repository에 존재하지 않습니다.", "Git restore --staged error");
+        }
+
+    }
     private void showErrorMessage(String errorMessage, String errorTitle) {
         JOptionPane.showMessageDialog(gui, errorMessage, errorTitle, JOptionPane.ERROR_MESSAGE);
     }
