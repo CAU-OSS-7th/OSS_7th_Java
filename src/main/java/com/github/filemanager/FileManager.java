@@ -1018,7 +1018,7 @@ public class FileManager {
 
             if (modified.contains(file.getName())){return true;}
             else{
-                showErrorMessage("선택한 파일은 Modified 상태가 아닙니다.", "UnModified file chosen error");
+                showErrorMessage("선택한 파일은 Modified 상태가 아닙니다. ", "UnModified file chosen error");
             }
         }catch (IOException | GitAPIException e ){
             e.printStackTrace();
