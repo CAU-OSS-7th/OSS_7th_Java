@@ -447,9 +447,7 @@ public class FileManager {
             gitRestoreFile = new JButton("Git restore");
             gitRestoreFile.setMnemonic('R');
             gitRestoreFile.addActionListener(new ActionListener() {
-                public void actionPerformed(ActionEvent ae) {
-                    // 여기에다가 restore 로직 추가
-                }
+                public void actionPerformed(ActionEvent ae) {gitRestoreFile();}
             });
             toolBar.add(gitRestoreFile);
 
@@ -1001,6 +999,64 @@ public class FileManager {
             });
         } catch (IOException | GitAPIException e) {
             e.printStackTrace();
+        }
+
+    }
+
+    /**
+     * 단일 파일을 선택 했을 때 해당 파일이 Modified 상태인지 확인해 주는 boolean 함수
+    */
+    private boolean isModifiedFile(File file) {
+        try{
+            Git git;
+            git = Git.open(currentFile.getParentFile());
+            Status status = git.status().call();
+            Set<String> modified = status.getModified();
+
+            if (modified.contains(file.getName())){return true;}
+            else{
+                showErrorMessage("선택한 파일은 Modified 상태가 아닙니다. ", "UnModified file chosen error");
+            }
+        }catch (IOException | GitAPIException e ){
+            e.printStackTrace();
+        }
+        return false;
+    }
+    private void gitRestoreFile(){ //git restore 실행 로직
+        if (currentFile == null || !isFileSelectedInList) { //선택한 파일이 없으면 에러 메시지. List가 아닌 Tree에서 파일을 선택했을 경우도 포함
+            showErrorMessage("파일을 선택해주세요.", "Select File");
+            return;
+        }
+        if(isFileInGitRepository()){ //.git 파일이 있는 경우 진행
+            try{
+                if(isModifiedFile(currentFile)){ //선택한 파일이 Modified 상태인 경우
+                    int result = JOptionPane.showConfirmDialog(gui, "해당 파일 혹은 디렉토리를 restore 하시겠습니까?", "git restore", JOptionPane.ERROR_MESSAGE);
+                    if(result == JOptionPane.OK_OPTION){ //restore 여부에서 확인을 받은 경우 git restore 명령어 수행
+
+                        String[] gitRestoreCommand = {"git", "restore", currentFile.getName()};
+                        ProcessBuilder processBuilder = new ProcessBuilder(gitRestoreCommand);
+                        processBuilder.directory(currentFile.getParentFile());
+                        Process process = processBuilder.start();
+                        int commitStatus = process.waitFor(); //git restore 명령어 정상 수행여부
+                        if(commitStatus ==0){ // 정상수행을 의미
+                            JOptionPane.showMessageDialog(gui, "복원이 성공적으로 이뤄졌습니다.");
+                            System.out.println(currentFile);
+                            System.out.println("Restored");
+                            try{
+                                renderGitFileStatus(); //커밋했을 경우, 파일에 변화가 일어났으므로 렌더링
+                            }catch (IOException | GitAPIException e){
+                                e.printStackTrace();
+                            }
+                        }else{ // 정상 수행이 아닌경우
+                            showErrorMessage("복원 과정이 정상적으로 이뤄지지 않았습니다.", "Git restore error");
+                        }
+                    }else{return;} //사용자가 복원을 원치 않는 경우
+                }
+            }catch (IOException | InterruptedException e ){
+                e.printStackTrace();
+            }
+        }else{ //.git이 존재하지 않는 경우
+            showErrorMessage("선택한 파일은 .git repository에 존재하지 않습니다.", "Git restore error");
         }
 
     }
