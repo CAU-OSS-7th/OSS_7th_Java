@@ -667,11 +667,6 @@ public class FileManager {
             }
         }
         gui.repaint();
-        try{
-            renderGitFileStatus(); //파일을 생성했을 경우, 목록에 변화가 일어나므로 렌더링
-        }catch (IOException | GitAPIException e){
-            e.printStackTrace();
-        }
     }
 
 //
@@ -708,7 +703,7 @@ public class FileManager {
             return;
         }
 
-        if((isFileSelectedInList && isFileInGitRepository()) || isTreeInGitRepository()) {
+        if((isFileSelectedInList && isFileInGitRepository()) || (!isFileSelectedInList && isTreeInGitRepository())) {
             showErrorMessage("이 파일은 이미 .git이 존재합니다.", "Already Initialized");
             return;
         }
@@ -718,7 +713,11 @@ public class FileManager {
             if (result == JOptionPane.OK_OPTION) { // "예" 클릭 시 git init 명령어 실행
                 String[] command = {"git", "init"};
                 ProcessBuilder processBuilder = new ProcessBuilder(command);
-                processBuilder.directory(currentFile);
+                if (currentFile.isFile()){ //단일 파일을 경로로 선택하고 git init실행시 오류 발생하므로, 부모 경로로 설정한 후 git init 실행
+                    processBuilder.directory(currentFile.getParentFile());
+                }else{ //디렉토리를 경로로 선택하고 git init 실행 시 현재 경로 그대로 가져오기
+                    processBuilder.directory(currentFile);
+                }
                 Process process = processBuilder.start();
                 BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream()));
                 String line;
@@ -1068,7 +1067,11 @@ public class FileManager {
         try {
             Git git;
             if (isFileSelectedInList){ //파일 목록창을 클릭하거나, 변화가 생겨 새로고침될 경우 단일 파일 선택 상태이므로 부모 경로를 찾는다.
-                git = Git.open(currentFile.getParentFile());
+                if (currentFile.isFile()){ //단일 파일 선택시 렌더링 오류가 일어나는 듯하여 디렉토리가 아니라면 부모 디렉토리에서 탐색
+                    git = Git.open(currentFile.getParentFile());
+                }else{
+                    git = Git.open(currentFile);//디렉토리라면 그대로
+                }
             }else{ //왼쪽 Tree에서 폴더를 선택할 경우, 그 폴더 내의 .git을 스캔해야 하므로 경로를 그대로 가져온다.
                 git = Git.open(currentFile);
             }
