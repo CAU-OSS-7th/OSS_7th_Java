@@ -1009,16 +1009,17 @@ public class FileManager {
     /**
      * 단일 파일을 선택 했을 때 해당 파일이 Modified 상태인지 확인해 주는 boolean 함수
     */
-    private boolean isModifiedFile() {
+    private boolean isModifiedFile(File file) {
         try{
             Git git;
             git = Git.open(currentFile.getParentFile());
             Status status = git.status().call();
             Set<String> modified = status.getModified();
-            if (modified.isEmpty()){
+
+            if (modified.contains(file.getName())){return true;}
+            else{
                 showErrorMessage("선택한 파일은 Modified 상태가 아닙니다.", "UnModified file chosen error");
-                return false;
-            }else{return true;}
+            }
         }catch (IOException | GitAPIException e ){
             e.printStackTrace();
         }
@@ -1031,7 +1032,7 @@ public class FileManager {
         }
         if(isFileInGitRepository()){ //.git 파일이 있는 경우 진행
             try{
-                if(isModifiedFile()){ //선택한 파일이 Modified 상태인 경우
+                if(isModifiedFile(currentFile)){ //선택한 파일이 Modified 상태인 경우
                     int result = JOptionPane.showConfirmDialog(gui, "해당 파일 혹은 디렉토리를 restore 하시겠습니까?", "git restore", JOptionPane.ERROR_MESSAGE);
                     if(result == JOptionPane.OK_OPTION){ //restore 여부에서 확인을 받은 경우 git restore 명령어 수행
 
