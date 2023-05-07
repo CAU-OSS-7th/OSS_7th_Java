@@ -1170,17 +1170,17 @@ public class FileManager {
 
         if(isFileInGitRepository()) {//2.git repo안에 있는 경우에만 실행.
             try{
-                if(isCommittedOrUnmodifiedFile(currentFile)) {//파일이 Committed, Unmodified 상태인 경우에만 실행
+                if(isCommittedOrUnmodifiedFile(currentFile)) {//3.파일이 Committed, Unmodified 상태인 경우에만 실행
                     int result = JOptionPane.showConfirmDialog(gui, "해당 파일을 삭제하고 untracked 하시겠습니까?", "git rm --cached", JOptionPane.ERROR_MESSAGE);
 
-                    if (result == JOptionPane.OK_OPTION) { // "예" 클릭 시 git rm 명령어 실행
+                    if (result == JOptionPane.OK_OPTION) { //4. "예" 클릭 시 git rm 명령어 실행
                         String[] gitRmCCCommand = {"git", "rm", "--cached", currentFile.getName()};
                         ProcessBuilder processBuilder = new ProcessBuilder(gitRmCCCommand);
                         processBuilder.directory(currentFile.getParentFile());
                         Process process = processBuilder.start();
                         int rmStatus = process.waitFor(); //git rm --cached 명령어 정상 실행 여부
 
-                        if (rmStatus == 0) { // git rm --cached 명령어가 정상적으로 실행되어 status가 0일 경우
+                        if (rmStatus == 0) { //5. git rm --cached 명령어가 정상적으로 실행되어 status가 0일 경우
                             JOptionPane.showMessageDialog(gui, "성공적으로 파일을 remove && untracked 했습니다.");
                             System.out.println(currentFile);
                             System.out.println("removed && untracked");
@@ -1200,7 +1200,6 @@ public class FileManager {
         }else{ //2. .git이 존재하지 않는 경우 (git status 명령어가 실패했을 경우)
             showErrorMessage("(현재 폴더 또는 상위 폴더 중 일부가) 깃 저장소가 아닙니다.","git rm error");
         }
-        //
     }
     /**
      * 파일 목록에 각 파일들의 status에 따라 테이블의 색상을 다르게 설정하는 렌더링 함수. 디렉토리에서 폴더를 클릭하거나, 파일을 선택하거나,
