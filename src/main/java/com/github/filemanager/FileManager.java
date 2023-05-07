@@ -180,6 +180,13 @@ public class FileManager {
             table.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
             table.setAutoCreateRowSorter(true);
             table.setShowVerticalLines(false);
+            try {
+                renderGitFileStatus(); //초기 렌더링 설정. 나중에 딜레이 안생김
+            }catch (GitAPIException | IOException e){
+                e.printStackTrace();
+            }
+
+
 
             listSelectionListener = new ListSelectionListener() {
                 @Override
