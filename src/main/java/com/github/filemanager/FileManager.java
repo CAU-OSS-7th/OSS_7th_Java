@@ -180,6 +180,13 @@ public class FileManager {
             table.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
             table.setAutoCreateRowSorter(true);
             table.setShowVerticalLines(false);
+            try {
+                renderGitFileStatus(); //초기 렌더링 설정. 나중에 딜레이 안생김
+            }catch (GitAPIException | IOException e){
+                e.printStackTrace();
+            }
+
+
 
             listSelectionListener = new ListSelectionListener() {
                 @Override
@@ -841,9 +848,10 @@ public class FileManager {
         Status status = git.status().call();
         Set<String>staged = status.getAdded();
         Set<String> changed = status.getChanged(); //변경사항이 stage되면 changed로 상태가 바뀌므로 따로 가져옴
+        Set<String> removed = status.getRemoved();
 
         // 테이블 데이터로 변환하기
-        Object[][] data = new Object[staged.size() + changed.size()][2];
+        Object[][] data = new Object[staged.size() + changed.size() + removed.size()][2];
         int i = 0;
         for (String fileName : staged) {
             String fileStatus = "new file";
@@ -852,6 +860,11 @@ public class FileManager {
         }
         for (String fileName : changed) {
             String fileStatus = "modified";
+            data[i] = new Object[]{fileName, fileStatus};
+            i++;
+        }
+        for (String fileName : removed) {
+            String fileStatus = "deleted";
             data[i] = new Object[]{fileName, fileStatus};
             i++;
         }
@@ -1087,14 +1100,11 @@ public class FileManager {
                             JOptionPane.showMessageDialog(gui, "성공적으로 파일을 remove 했습니다.");
                             System.out.println(currentFile);
                             System.out.println("removed && change staged");
-                            try {
-                                renderGitFileStatus(); //스테이지했을 경우, 파일에 변화가 일어났으므로 렌더링
-                                TreePath parentPath = findTreePath(currentFile.getParentFile());
-                                DefaultMutableTreeNode parentNode = (DefaultMutableTreeNode) parentPath.getLastPathComponent();
-                                showChildren(parentNode);
-                            } catch (IOException | GitAPIException e) {
-                                e.printStackTrace();
-                            }
+                            // renderGitFileStatus(); //파일이 단순히 삭제되는 것이므로 다른 파일 목록엔 변화가 없음. Exception 방지
+                            isFileSelectedInList = false; //파일이 삭제되어 선택된 파일이 없으므로 false
+                            TreePath parentPath = findTreePath(currentFile.getParentFile());
+                            DefaultMutableTreeNode parentNode = (DefaultMutableTreeNode) parentPath.getLastPathComponent();
+                            showChildren(parentNode);
                         } else { //git rm 명령어가 정상적으로 실행되지 않았을 경우
                             showErrorMessage("파일을 remove하는 과정에서 오류가 발생했습니다.", "git rm error");
                         }
