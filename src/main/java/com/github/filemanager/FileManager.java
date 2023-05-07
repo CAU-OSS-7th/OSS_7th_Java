@@ -968,81 +968,96 @@ public class FileManager {
         JLabel file_fromLabel;
         JButton okButton, cancelButton;
         //
-        if (currentFile == null) {//1.파일 선택하지 않았을 경우, 별도행위없이 함수종료
+        if (currentFile == null || !isFileSelectedInList) {//1.파일 선택하지 않았을 경우, 별도행위없이 함수종료
             showErrorMessage("파일을 선택해주세요.", "Select File");
             return;
         }
 
         if(isFileInGitRepository()) {//2.git repo안에 있는 경우에만 실행.
-            //file_from과 file_to를 명시할 mvPanel
-            mvPanel = new JPanel(new GridLayout(1, 4));
-            JLabel file_from = new JLabel(" file_from:"); JLabel file_to = new JLabel(" file_to:");
-            file_from.setPreferredSize(new Dimension(50, 20));
-            file_to.setPreferredSize(new Dimension(50, 20));
+            if(isCommittedOrUnmodifiedFile(currentFile)) {//파일이 Committed, Unmodified 상태인 경우에만 실행
+                //file_from과 file_to를 명시할 mvPanel
+                mvPanel = new JPanel(new GridLayout(1, 4));
+                JLabel file_from = new JLabel(" file_from:");
+                JLabel file_to = new JLabel(" file_to:");
+                file_from.setPreferredSize(new Dimension(50, 20));
+                file_to.setPreferredSize(new Dimension(50, 20));
 
-            //선택한 파일과 사용자 입력을 받을 JtextField
-            file_fromLabel = new JLabel(" " + currentFile.getName()); file_fromLabel.setPreferredSize(new Dimension(100, 20));
-            textField = new JTextField(); textField.setPreferredSize(new Dimension(100, 20));
-            mvPanel.add(file_from); mvPanel.add(file_fromLabel); mvPanel.add(file_to); mvPanel.add(textField);
-            mvPanel.setPreferredSize(new Dimension(300, 20));
+                //선택한 파일과 사용자 입력을 받을 JtextField
+                file_fromLabel = new JLabel(" " + currentFile.getName());
+                file_fromLabel.setPreferredSize(new Dimension(100, 20));
+                textField = new JTextField();
+                textField.setPreferredSize(new Dimension(100, 20));
+                mvPanel.add(file_from);
+                mvPanel.add(file_fromLabel);
+                mvPanel.add(file_to);
+                mvPanel.add(textField);
+                mvPanel.setPreferredSize(new Dimension(300, 20));
 
-            //동작을 구현할 buttonPanel
-            okButton = new JButton("Ok"); cancelButton = new JButton("Cancel");
-            buttonPanel = new JPanel(new GridLayout());
-            buttonPanel.add(cancelButton); buttonPanel.add(okButton);
+                //동작을 구현할 buttonPanel
+                okButton = new JButton("Ok");
+                cancelButton = new JButton("Cancel");
+                buttonPanel = new JPanel(new GridLayout());
+                buttonPanel.add(cancelButton);
+                buttonPanel.add(okButton);
 
-            //Panel들을 포함할 Frame
-            mvFrame = new JFrame(); mvFrame.setLayout(new BorderLayout());
-            mvFrame.add(mvPanel, BorderLayout.CENTER); mvFrame.add(buttonPanel, BorderLayout.SOUTH);
-            mvFrame.setVisible(true); mvFrame.pack();
-            mvFrame.setLocationRelativeTo(null);
+                //Panel들을 포함할 Frame
+                mvFrame = new JFrame();
+                mvFrame.setLayout(new BorderLayout());
+                mvFrame.add(mvPanel, BorderLayout.CENTER);
+                mvFrame.add(buttonPanel, BorderLayout.SOUTH);
+                mvFrame.setVisible(true);
+                mvFrame.pack();
+                mvFrame.setLocationRelativeTo(null);
 
-            //okButton동작. 공란과 이미 존재하는 파일명에 대한 검사, 이상없을 시 git mv명령어 실행
-            okButton.addActionListener(new ActionListener() {
-                @Override
-                public void actionPerformed(ActionEvent e) {
-                    String file_from_string = currentFile.getName();
-                    String file_to_string = textField.getText();
-                    if(file_to_string.isEmpty()){//파일명 공란검사
-                        showErrorMessage("파일명은 공백이 될 수 없습니다.","git mv error");
-                    }
-                    if(ifSameNameExist(file_to_string)){//이미 존재하는 파일명 검사
-                        showErrorMessage("이미 존재하는 파일명입니다.","git mv error");
-                    }
-                    try{//git mv 명령어 실행
-                        String[] gitMvCommand = {"git", "mv", currentFile.getName(), file_to_string};
-                        ProcessBuilder processBuilder = new ProcessBuilder(gitMvCommand);
-                        processBuilder.directory(currentFile.getParentFile());
-                        Process process = processBuilder.start();
-                        int mvStatus = process.waitFor(); //git add 명령어 정상 실행 여부
-                        mvFrame.dispose();
-                        if (mvStatus == 0){ // git mv 명령어가 정상적으로 실행되어 status가 0일 경우
-                            JOptionPane.showMessageDialog(gui, "성공적으로 파일을 Rename했습니다.");
-                            System.out.println(file_from_string + " -> " + file_to_string);
-                            System.out.println("Renamed");
-                            try{
-                                renderGitFileStatus(); //스테이지 했을 경우, 파일에 변화가 일어났으므로 렌더링
-                                TreePath parentPath = findTreePath(currentFile.getParentFile());
-                                DefaultMutableTreeNode parentNode = (DefaultMutableTreeNode) parentPath.getLastPathComponent();
-                                showChildren(parentNode);
-                            }catch(IOException | GitAPIException e1){
-                                e1.printStackTrace();
+                //okButton동작. 공란과 이미 존재하는 파일명에 대한 검사, 이상없을 시 git mv명령어 실행
+                okButton.addActionListener(new ActionListener() {
+                    @Override
+                    public void actionPerformed(ActionEvent e) {
+                        String file_from_string = currentFile.getName();
+                        String file_to_string = textField.getText();
+                        if (file_to_string.isEmpty()) {//파일명 공란검사
+                            showErrorMessage("파일명은 공백이 될 수 없습니다.", "git mv error");
+                        }
+                        if (ifSameNameExist(file_to_string)) {//이미 존재하는 파일명 검사
+                            showErrorMessage("이미 존재하는 파일명입니다.", "git mv error");
+                        }
+                        try {//git mv 명령어 실행
+                            String[] gitMvCommand = {"git", "mv", currentFile.getName(), file_to_string};
+                            ProcessBuilder processBuilder = new ProcessBuilder(gitMvCommand);
+                            processBuilder.directory(currentFile.getParentFile());
+                            Process process = processBuilder.start();
+                            int mvStatus = process.waitFor(); //git add 명령어 정상 실행 여부
+                            mvFrame.dispose();
+                            if (mvStatus == 0) { // git mv 명령어가 정상적으로 실행되어 status가 0일 경우
+                                JOptionPane.showMessageDialog(gui, "성공적으로 파일을 Rename했습니다.");
+                                System.out.println(file_from_string + " -> " + file_to_string);
+                                System.out.println("Renamed");
+                                try {
+                                    renderGitFileStatus(); //스테이지 했을 경우, 파일에 변화가 일어났으므로 렌더링
+                                    TreePath parentPath = findTreePath(currentFile.getParentFile());
+                                    DefaultMutableTreeNode parentNode = (DefaultMutableTreeNode) parentPath.getLastPathComponent();
+                                    showChildren(parentNode);
+                                } catch (IOException | GitAPIException e1) {
+                                    e1.printStackTrace();
+                                }
+                                gui.repaint();
+
+                            } else { //git mv 명령어가 정상적으로 실행되지 않았을 경우
+                                showErrorMessage("파일을 Rename하는 과정에서 오류가 발생했습니다.", "git mv error");
                             }
-                            gui.repaint();
-                        }else{ //git mv 명령어가 정상적으로 실행되지 않았을 경우
-                            showErrorMessage("파일을 Rename하는 과정에서 오류가 발생했습니다.","git mv error");
+                        } catch (InterruptedException | IOException e2) {
+                            e2.printStackTrace();
                         }
                     }
-                    catch (InterruptedException | IOException e2){  e2.printStackTrace();  }
-                }
-            });
+                });
 
-            cancelButton.addActionListener(new ActionListener() {
-                @Override
-                public void actionPerformed(ActionEvent e) {
-                    mvFrame.dispose();
-                }
-            });
+                cancelButton.addActionListener(new ActionListener() {
+                    @Override
+                    public void actionPerformed(ActionEvent e) {
+                        mvFrame.dispose();
+                    }
+                });
+            }
         }else{ //2. .git이 존재하지 않는 경우 (git status 명령어가 실패했을 경우)
             showErrorMessage("(현재 폴더 또는 상위 폴더 중 일부가) 깃 저장소가 아닙니다.","git mv error");
         }
