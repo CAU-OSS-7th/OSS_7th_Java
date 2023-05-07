@@ -429,7 +429,7 @@ public class FileManager {
             gitRmFile.setMnemonic('R');
             gitRmFile.addActionListener(new ActionListener() {
                 public void actionPerformed(ActionEvent ae) {
-                    // 여기에다가 rm 로직 추가
+                    gitRmFile();
                 }
             });
             toolBar.add(gitRmFile);
@@ -1054,6 +1054,59 @@ public class FileManager {
             }
         }
         return false;
+    }
+
+    private void gitRmFile(){
+    /*
+    파일을 클릭하고 버튼을 누르면 git rm 명령어 실행.
+
+    --> 1.버튼이 눌렸을 떄 선택된 파일이 있는지 확인 (o)
+    --> 2.git repo안의 파일인지 확인 (o)
+    --> 3.git rm 명령어 실행 (o)
+    --> 4.결과에 따른 반환값에 따른 팝업창 생성 (o)
+    */
+
+        //
+        if (currentFile == null) {//1.파일 선택하지 않았을 경우, 별도행위없이 함수종료
+            showErrorMessage("파일을 선택해주세요.", "Select File");
+            return;
+        }
+
+        if(isFileInGitRepository()) {//2.git repo안에 있는 경우에만 실행.
+            try{
+                int result = JOptionPane.showConfirmDialog(gui, "해당 파일을 삭제하고 이 변화를 staged하시겠습니까?", "git rm", JOptionPane.ERROR_MESSAGE);
+
+                if (result == JOptionPane.OK_OPTION) { // "예" 클릭 시 git rm 명령어 실행
+                    String[] gitRmCommand = {"git", "rm", currentFile.getName()};
+                    ProcessBuilder processBuilder = new ProcessBuilder(gitRmCommand);
+                    processBuilder.directory(currentFile.getParentFile());
+                    Process process = processBuilder.start();
+                    int rmStatus = process.waitFor(); //git rm 명령어 정상 실행 여부
+
+                    if (rmStatus == 0){ // git rm 명령어가 정상적으로 실행되어 status가 0일 경우
+                        JOptionPane.showMessageDialog(gui, "성공적으로 파일을 remove 했습니다.");
+                        System.out.println(currentFile);
+                        System.out.println("removed && change staged");
+                        try{
+                            renderGitFileStatus(); //스테이지했을 경우, 파일에 변화가 일어났으므로 렌더링
+                            TreePath parentPath = findTreePath(currentFile.getParentFile());
+                            DefaultMutableTreeNode parentNode = (DefaultMutableTreeNode) parentPath.getLastPathComponent();
+                            showChildren(parentNode);
+                        }catch (IOException | GitAPIException e){
+                            e.printStackTrace();
+                        }
+                    }else{ //git rm 명령어가 정상적으로 실행되지 않았을 경우
+                        showErrorMessage("파일을 remove하는 과정에서 오류가 발생했습니다.","git rm error");
+                    }
+                }
+                gui.repaint();
+            } catch (InterruptedException | IOException e){
+                e.printStackTrace();
+            }
+        }else{ //2. .git이 존재하지 않는 경우 (git status 명령어가 실패했을 경우)
+            showErrorMessage("(현재 폴더 또는 상위 폴더 중 일부가) 깃 저장소가 아닙니다.","git rm error");
+        }
+        //
     }
 
     /**
