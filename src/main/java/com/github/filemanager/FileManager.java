@@ -1022,12 +1022,12 @@ public class FileManager {
                             showErrorMessage("이미 존재하는 파일명입니다.", "git mv error");
                         }
                         try {//git mv 명령어 실행
+                            mvFrame.dispose();
                             String[] gitMvCommand = {"git", "mv", currentFile.getName(), file_to_string};
                             ProcessBuilder processBuilder = new ProcessBuilder(gitMvCommand);
                             processBuilder.directory(currentFile.getParentFile());
                             Process process = processBuilder.start();
                             int mvStatus = process.waitFor(); //git add 명령어 정상 실행 여부
-                            mvFrame.dispose();
                             if (mvStatus == 0) { // git mv 명령어가 정상적으로 실행되어 status가 0일 경우
                                 JOptionPane.showMessageDialog(gui, "성공적으로 파일을 Rename했습니다.");
                                 System.out.println(file_from_string + " -> " + file_to_string);
