@@ -1171,9 +1171,12 @@ public class FileManager {
             Status status = git.status().call();
 
             Set<String> untracked = status.getUntracked();  //Untracked 파일 이름을 받아와 비교
+            Set<String> modified = status.getModified();    //Modified 파일 이름을 받아와 비교
+            Set<String> added = status.getAdded();  //staged는 added와 changed가 있음. 두 가지 상태의 파일 이름을 받아와 비교
+            Set<String> changed = status.getChanged();
 
             //untracked, modified, staged가 아니라면 Committed or Unmodified상태.
-            if (!untracked.contains(file.getName()) && !isModifiedFile(file) && !isStagedFile(file)){return true;}
+            if (!untracked.contains(file.getName()) && !modified.contains(file.getName())&& !added.contains(file.getName()) && !changed.contains(file.getName())){return true;}
             else{
                 showErrorMessage("선택한 파일은 Committed나 UnModified 상태가 아닙니다. ", "Committed or Unmodified file chosen error");
             }
