@@ -1027,11 +1027,13 @@ public class FileManager {
                             ProcessBuilder processBuilder = new ProcessBuilder(gitMvCommand);
                             processBuilder.directory(currentFile.getParentFile());
                             Process process = processBuilder.start();
+                            File temp_parentFile = currentFile.getParentFile();
                             int mvStatus = process.waitFor(); //git add 명령어 정상 실행 여부
                             if (mvStatus == 0) { // git mv 명령어가 정상적으로 실행되어 status가 0일 경우
                                 JOptionPane.showMessageDialog(gui, "성공적으로 파일을 Rename했습니다.");
                                 System.out.println(file_from_string + " -> " + file_to_string);
                                 System.out.println("Renamed");
+                                currentFile = findRenamedFile(temp_parentFile, file_to_string);
                                 try {
                                     renderGitFileStatus(); //스테이지 했을 경우, 파일에 변화가 일어났으므로 렌더링
                                     TreePath parentPath = findTreePath(currentFile.getParentFile());
@@ -1063,7 +1065,16 @@ public class FileManager {
         }
         //
     }
-
+    /**
+     이름이 바뀌면 currentFile을 찾지 못하는 경우 발생, 미리 ParentFile을 가지고 있다가 이름이 바뀐 파일을 찾아내어서 currentFile을 최신화해주는 함수.
+     */
+    private File findRenamedFile(File parentFile, String fileName){
+        File[] files = parentFile.listFiles();
+        for(File file : files){
+            if(file.getName().equals(fileName)){return file;}
+        }
+        return null;
+    }
     /**
      해당 파일이 위차한 폴더 내에 같은 인자로 주어진 String 명이 이미 존재하는지 검사하는 함수.
      */
