@@ -1101,6 +1101,7 @@ public class FileManager {
                             System.out.println(currentFile);
                             System.out.println("removed && change staged");
                             // renderGitFileStatus(); //파일이 단순히 삭제되는 것이므로 다른 파일 목록엔 변화가 없음. Exception 방지
+                            isFileSelectedInList = false; //파일이 삭제되어 선택된 파일이 없으므로 false
                             TreePath parentPath = findTreePath(currentFile.getParentFile());
                             DefaultMutableTreeNode parentNode = (DefaultMutableTreeNode) parentPath.getLastPathComponent();
                             showChildren(parentNode);
