@@ -443,7 +443,7 @@ public class FileManager {
             gitRmCachedFile.setMnemonic('R');
             gitRmCachedFile.addActionListener(new ActionListener() {
                 public void actionPerformed(ActionEvent ae) {
-                    // 여기에다가 rm --cached 로직 추가
+                    gitRmCachedFile();
                 }
             });
             toolBar.add(gitRmCachedFile);
@@ -1153,6 +1153,55 @@ public class FileManager {
         //
     }
 
+    private void gitRmCachedFile(){
+    /*
+    파일을 클릭하고 버튼을 누르면 git rm --cached명령어 실행.
+
+    --> 1.버튼이 눌렸을 때 선택된 파일이 있는지 확인 (o)
+    --> 2.git repo안의 파일인지 확인 (o)
+    --> 3.해당 파일이 Committed 상태인지 확인 (o).
+    --> 4.git rm --cached 명령어 실행 (o)
+    --> 5.결과에 따른 반환값에 따른 팝업창 생성 (o)
+    */
+        if (currentFile == null || !isFileSelectedInList) {//1.파일 선택하지 않았을 경우, 별도행위없이 함수종료
+            showErrorMessage("파일을 선택해주세요.", "Select File");
+            return;
+        }
+
+        if(isFileInGitRepository()) {//2.git repo안에 있는 경우에만 실행.
+            try{
+                if(isCommittedOrUnmodifiedFile(currentFile)) {//파일이 Committed, Unmodified 상태인 경우에만 실행
+                    int result = JOptionPane.showConfirmDialog(gui, "해당 파일을 삭제하고 untracked 하시겠습니까?", "git rm --cached", JOptionPane.ERROR_MESSAGE);
+
+                    if (result == JOptionPane.OK_OPTION) { // "예" 클릭 시 git rm 명령어 실행
+                        String[] gitRmCCCommand = {"git", "rm", "--cached", currentFile.getName()};
+                        ProcessBuilder processBuilder = new ProcessBuilder(gitRmCCCommand);
+                        processBuilder.directory(currentFile.getParentFile());
+                        Process process = processBuilder.start();
+                        int rmStatus = process.waitFor(); //git rm --cached 명령어 정상 실행 여부
+
+                        if (rmStatus == 0) { // git rm --cached 명령어가 정상적으로 실행되어 status가 0일 경우
+                            JOptionPane.showMessageDialog(gui, "성공적으로 파일을 remove && untracked 했습니다.");
+                            System.out.println(currentFile);
+                            System.out.println("removed && untracked");
+                            isFileSelectedInList = false; //파일이 삭제되어 선택된 파일이 없으므로 false
+                            TreePath parentPath = findTreePath(currentFile.getParentFile());
+                            DefaultMutableTreeNode parentNode = (DefaultMutableTreeNode) parentPath.getLastPathComponent();
+                            showChildren(parentNode);
+                        } else { //git rm --cached 명령어가 정상적으로 실행되지 않았을 경우
+                            showErrorMessage("파일을 remove하는 과정에서 오류가 발생했습니다.", "git rm --cached error");
+                        }
+                    }
+                    gui.repaint();
+                }
+            } catch (InterruptedException | IOException e){
+                e.printStackTrace();
+            }
+        }else{ //2. .git이 존재하지 않는 경우 (git status 명령어가 실패했을 경우)
+            showErrorMessage("(현재 폴더 또는 상위 폴더 중 일부가) 깃 저장소가 아닙니다.","git rm error");
+        }
+        //
+    }
     /**
      * 파일 목록에 각 파일들의 status에 따라 테이블의 색상을 다르게 설정하는 렌더링 함수. 디렉토리에서 폴더를 클릭하거나, 파일을 선택하거나,
      * 탐색기의 버튼을 누를 때마다 호출됨.
