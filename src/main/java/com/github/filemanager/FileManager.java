@@ -417,10 +417,7 @@ public class FileManager {
             gitMvFile = new JButton("Git mv");
             gitMvFile.setMnemonic('M');
             gitMvFile.addActionListener(new ActionListener() {
-                public void actionPerformed(ActionEvent ae) {
-                    // 여기에다가 mv 로직 추가
-                    gitMvFile();
-                }
+                public void actionPerformed(ActionEvent ae) { gitMvFile(); }
             });
             toolBar.add(gitMvFile);
 
@@ -950,18 +947,20 @@ public class FileManager {
         }
     }
 
+    /**
+     git mv버튼을 누를 때 실행되는 mv 로직함수
+     */
     private void gitMvFile(){
     /*
     파일을 클릭하고 버튼을 누르면 새 파일명을 입력받는 팝업창이 뜨고, 파일명을 입력, 확인 버튼을 누르면 새 파일명으로 변경된다.
     기존 파일명과 새 파일명이 같거나 파일명이 비어있다면 경고메세지(ex: 파일명이 동일합니다.)팝업창 출력.
-    commit쪽 로직을 참고하면 도움이 될것
 
     --> 1.버튼이 눌렸을 떄 선택된 파일이 있는지 확인 (o)
     --> 2.git repo안의 파일인지 확인 (o)
     --> 3.새 파일명을 입력받는 팝업창 생성 (o)
-    --> 4.확인버튼 누르면 비어있는지 확인, 기존 파일들과 이름 비교 => 현재 폴더내의 파일이름 list 저장필요.
-    --> 5.해당사항 없으면 새 파일명으로 변경(git rm file_from file_new 명령어 실행).
-    --> 6.결과에 따른 반환값, 에 따른 팝업창 생성
+    --> 4.확인버튼 누르면 비어있는지 확인, 기존 파일들과 이름 비교 (o)
+    --> 5.해당사항 없으면 새 파일명으로 변경(git rm file_from file_new 명령어 실행). (o)
+    --> 6.결과에 따른 반환값에 따른 팝업창 생성 (o)
     */
         JFrame mvFrame;
         JPanel mvPanel, buttonPanel;
@@ -1011,25 +1010,30 @@ public class FileManager {
                         showErrorMessage("이미 존재하는 파일명입니다.","git mv error");
                     }
                     try{//git mv 명령어 실행
-                        String[] gitAddCommand = {"git", "mv", currentFile.getName(), file_to_string};
-                        ProcessBuilder processBuilder = new ProcessBuilder(gitAddCommand);
+                        String[] gitMvCommand = {"git", "mv", currentFile.getName(), file_to_string};
+                        ProcessBuilder processBuilder = new ProcessBuilder(gitMvCommand);
                         processBuilder.directory(currentFile.getParentFile());
                         Process process = processBuilder.start();
                         int mvStatus = process.waitFor(); //git add 명령어 정상 실행 여부
-
+                        mvFrame.dispose();
                         if (mvStatus == 0){ // git mv 명령어가 정상적으로 실행되어 status가 0일 경우
                             JOptionPane.showMessageDialog(gui, "성공적으로 파일을 Rename했습니다.");
                             System.out.println(file_from_string + " -> " + file_to_string);
                             System.out.println("Renamed");
+                            try{
+                                renderGitFileStatus(); //스테이지 했을 경우, 파일에 변화가 일어났으므로 렌더링
+                                TreePath parentPath = findTreePath(currentFile.getParentFile());
+                                DefaultMutableTreeNode parentNode = (DefaultMutableTreeNode) parentPath.getLastPathComponent();
+                                showChildren(parentNode);
+                            }catch(IOException | GitAPIException e1){
+                                e1.printStackTrace();
+                            }
+                            gui.repaint();
                         }else{ //git mv 명령어가 정상적으로 실행되지 않았을 경우
                             showErrorMessage("파일을 Rename하는 과정에서 오류가 발생했습니다.","git mv error");
                         }
-                        renderGitFileStatus(); gui.repaint();
                     }
-                    catch (InterruptedException | IOException e2){  e2.printStackTrace(); } catch (GitAPIException ex) {
-                        throw new RuntimeException(ex);
-                    }
-
+                    catch (InterruptedException | IOException e2){  e2.printStackTrace();  }
                 }
             });
 
@@ -1045,10 +1049,13 @@ public class FileManager {
         //
     }
 
+    /**
+     해당 파일이 위차한 폴더 내에 같은 인자로 주어진 String 명이 이미 존재하는지 검사하는 함수.
+     */
     private boolean ifSameNameExist(String fileName) { //현재 directory에 같은 이름의 파일이 이미 존재하는지 검사하는 함수
         File[] files = currentFile.getParentFile().listFiles();
         for (File file : files) {
-            if (file.getName().equals(fileName)) { //부모 폴더에 입력한 이름과 같은 명의 폴더에 존재한다면 true반환
+            if (file.getName().equals(fileName)) { //부모 폴더에 입력한 이름과 같은 명의 파일이 존재한다면 true반환
                 return true;
             }
         }
