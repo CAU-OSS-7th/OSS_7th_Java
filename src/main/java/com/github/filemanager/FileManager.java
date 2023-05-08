@@ -1299,13 +1299,18 @@ public class FileManager {
     */
     private boolean isModifiedFile(File file) {
         try{
-            Git git;
-            git = Git.open(currentFile.getParentFile()); //(5/8) RepositoryBuilder로 변경 필요
+            FileRepositoryBuilder builder = new FileRepositoryBuilder();
+            File gitDir = builder.findGitDir(file).getGitDir(); // .git 파일 위치 찾기
+            Repository repository = builder.setGitDir(gitDir).readEnvironment().findGitDir().build(); // Repository 객체 생성
+            File workDir = repository.getWorkTree(); // .git이 있는 파일
+            Path workDirPath = Paths.get(workDir.getAbsolutePath()); //.git 이 있는 폴더의 절대 경로
+            Path relativePath = workDirPath.relativize(Paths.get(file.getAbsolutePath())); // .git이 있는 폴더의 상대경로로 인자로 받은 파일의 위치를 나타내줌
+
+            Git git = Git.open(workDir.getAbsoluteFile()); //.git 파일이 있는 위치의 파일을 인자로 줌으로 jgit 사용
             Status status = git.status().call();
 
             Set<String> modified = status.getModified(); // Modified 파일 이름을 받아와 비교
-
-            if (modified.contains(file.getName())){return true;} //파일 이름에 현재 파일이 있는 경우
+            if (modified.contains(relativePath.toString())){return true;} //파일 이름에 현재 파일이 있는 경우
             else{
                 showErrorMessage("선택한 파일은 Modified 상태가 아닙니다. ", "UnModified file chosen error");
             }
