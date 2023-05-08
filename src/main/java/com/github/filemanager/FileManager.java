@@ -1112,7 +1112,7 @@ public class FileManager {
     --> 5.결과에 따른 반환값에 따른 팝업창 생성 (o)
     */
 
-        if (currentFile == null) {//1.파일 선택하지 않았을 경우, 별도행위없이 함수종료
+        if (currentFile == null || !isFileSelectedInList) {//1.파일 선택하지 않았을 경우, 별도행위없이 함수종료
             showErrorMessage("파일을 선택해주세요.", "Select File");
             return;
         }
@@ -1133,7 +1133,6 @@ public class FileManager {
                             JOptionPane.showMessageDialog(gui, "성공적으로 파일을 remove 했습니다.");
                             System.out.println(currentFile);
                             System.out.println("removed && change staged");
-                            // renderGitFileStatus(); //파일이 단순히 삭제되는 것이므로 다른 파일 목록엔 변화가 없음. Exception 방지
                             isFileSelectedInList = false; //파일이 삭제되어 선택된 파일이 없으므로 false
                             TreePath parentPath = findTreePath(currentFile.getParentFile());
                             DefaultMutableTreeNode parentNode = (DefaultMutableTreeNode) parentPath.getLastPathComponent();
@@ -1171,9 +1170,9 @@ public class FileManager {
         if(isFileInGitRepository()) {//2.git repo안에 있는 경우에만 실행.
             try{
                 if(isCommittedOrUnmodifiedFile(currentFile)) {//3.파일이 Committed, Unmodified 상태인 경우에만 실행
-                    int result = JOptionPane.showConfirmDialog(gui, "해당 파일을 삭제하고 untracked 하시겠습니까?", "git rm --cached", JOptionPane.ERROR_MESSAGE);
+                    int result = JOptionPane.showConfirmDialog(gui, "파일을 Committed/Unmodified 상태에서 untracked 상태로 바꾸시겠습니까?", "git rm --cached", JOptionPane.ERROR_MESSAGE);
 
-                    if (result == JOptionPane.OK_OPTION) { //4. "예" 클릭 시 git rm 명령어 실행
+                    if (result == JOptionPane.OK_OPTION) { //4. "예" 클릭 시 git rm --cached 명령어 실행
                         String[] gitRmCCCommand = {"git", "rm", "--cached", currentFile.getName()};
                         ProcessBuilder processBuilder = new ProcessBuilder(gitRmCCCommand);
                         processBuilder.directory(currentFile.getParentFile());
@@ -1181,10 +1180,9 @@ public class FileManager {
                         int rmStatus = process.waitFor(); //git rm --cached 명령어 정상 실행 여부
 
                         if (rmStatus == 0) { //5. git rm --cached 명령어가 정상적으로 실행되어 status가 0일 경우
-                            JOptionPane.showMessageDialog(gui, "성공적으로 파일을 remove && untracked 했습니다.");
+                            JOptionPane.showMessageDialog(gui, "성공적으로 파일을 untracked 했습니다.");
                             System.out.println(currentFile);
-                            System.out.println("removed && untracked");
-                            isFileSelectedInList = false; //파일이 삭제되어 선택된 파일이 없으므로 false
+                            System.out.println("untracked");
                             TreePath parentPath = findTreePath(currentFile.getParentFile());
                             DefaultMutableTreeNode parentNode = (DefaultMutableTreeNode) parentPath.getLastPathComponent();
                             showChildren(parentNode);
@@ -1198,7 +1196,7 @@ public class FileManager {
                 e.printStackTrace();
             }
         }else{ //2. .git이 존재하지 않는 경우 (git status 명령어가 실패했을 경우)
-            showErrorMessage("(현재 폴더 또는 상위 폴더 중 일부가) 깃 저장소가 아닙니다.","git rm error");
+            showErrorMessage("(현재 폴더 또는 상위 폴더 중 일부가) 깃 저장소가 아닙니다.","git rm --cached error");
         }
     }
     /**
