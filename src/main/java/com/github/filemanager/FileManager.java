@@ -1239,8 +1239,6 @@ public class FileManager {
             Set<String> modifiedFiles = status.getModified(); //Tracked 파일에 변경사항이 생겼을 경우 -> 주황색
             Set<String> untrackedFiles = status.getUntracked(); //새로운 파일이 생성되거나, untracked 파일일 경우 -> 빨간색
 
-
-
             table.setDefaultRenderer(Object.class, new DefaultTableCellRenderer() { //테이블 Render를 Override하여 색상을 변경할 수 있게 한다.
                 public Component getTableCellRendererComponent(JTable table, Object value, boolean isSelected, boolean hasFocus, int row, int column) {
                     Component c = super.getTableCellRendererComponent(table, value, isSelected, hasFocus, row, column);
@@ -1274,8 +1272,14 @@ public class FileManager {
      */
     private boolean isCommittedOrUnmodifiedFile(File file){
         try{
-            Git git;
-            git = Git.open(currentFile.getParentFile()); //(5/8) RepositoryBuilder로 변경 필요
+            FileRepositoryBuilder builder = new FileRepositoryBuilder();
+            File gitDir = builder.findGitDir(file).getGitDir(); // .git 파일 위치 찾기
+            Repository repository = builder.setGitDir(gitDir).readEnvironment().findGitDir().build(); // Repository 객체 생성
+            File workDir = repository.getWorkTree(); // .git이 있는 파일
+            Path workDirPath = Paths.get(workDir.getAbsolutePath()); //.git 이 있는 폴더의 절대 경로
+            Path relativePath = workDirPath.relativize(Paths.get(file.getAbsolutePath())); // .git이 있는 폴더의 상대경로로 인자로 받은 파일의 위치를 나타내줌
+
+            Git git = new Git(repository);
             Status status = git.status().call();
 
             Set<String> untracked = status.getUntracked();  //Untracked 파일 이름을 받아와 비교
@@ -1284,7 +1288,8 @@ public class FileManager {
             Set<String> changed = status.getChanged();
 
             //untracked, modified, staged가 아니라면 Committed or Unmodified상태.
-            if (!untracked.contains(file.getName()) && !modified.contains(file.getName())&& !added.contains(file.getName()) && !changed.contains(file.getName())){return true;}
+            if (!untracked.contains(relativePath.toString()) && !modified.contains(relativePath.toString())
+                    && !added.contains(relativePath.toString()) && !changed.contains(relativePath.toString())){return true;}
             else{
                 showErrorMessage("선택한 파일은 Committed나 UnModified 상태가 아닙니다. ", "Committed or Unmodified file chosen error");
             }
