@@ -1310,6 +1310,8 @@ public class FileManager {
             Status status = git.status().call();
 
             Set<String> modified = status.getModified(); // Modified 파일 이름을 받아와 비교
+
+            // Modified 파일에 인자로 받은 파일이 있는 경우 (이 때, 파일의 이름은 .git이 있는 폴더 경로으로 부터의 상대경로 + 파일 이름)
             if (modified.contains(relativePath.toString())){return true;} //파일 이름에 현재 파일이 있는 경우
             else{
                 showErrorMessage("선택한 파일은 Modified 상태가 아닙니다. ", "UnModified file chosen error");
@@ -1325,14 +1327,23 @@ public class FileManager {
      */
     private boolean isStagedFile(File file){
         try{
+            // jgit 사용 이전에 .git 파일의 위치를
+            FileRepositoryBuilder builder = new FileRepositoryBuilder();
+            File gitDir = builder.findGitDir(file).getGitDir(); // .git 파일 위치 찾기
+            Repository repository = builder.setGitDir(gitDir).readEnvironment().findGitDir().build(); // Repository 객체 생성
+            File workDir = repository.getWorkTree(); // .git이 있는 파일
+            Path workDirPath = Paths.get(workDir.getAbsolutePath()); //.git 이 있는 폴더의 절대 경로
+            Path relativePath = workDirPath.relativize(Paths.get(file.getAbsolutePath())); // .git이 있는 폴더의 상대경로로 인자로 받은 파일의 위치를 나타내줌
+
             Git git;
-            git = Git.open(currentFile.getParentFile()); //(5/8) RepositoryBuilder로 변경 필요
+            git = Git.open(workDir.getAbsoluteFile()); //.git 파일이 있는 위치의 파일을 인자로 줌으로 jgit 사용
             Status status = git.status().call();
             //staged 영역에 있는 경우는 2가지 존재
             Set<String> added = status.getAdded(); // 1. add 되고 수정이 없는 상태
             Set<String> changed = status.getChanged(); // 2. add 되고 수정이 있는 상태
 
-            if (added.contains(file.getName()) || changed.contains(file.getName())){return true;} // stage 영역에 파일이 있으면 true 반환
+            // stage 영역에 파일이 있으면 true 반환 (이 때, 파일의 이름은 .git이 있는 폴더 경로으로 부터의 상대경로 + 파일 이름)
+            if (added.contains(relativePath.toString()) || changed.contains(relativePath.toString())){return true;}
             else{
                 showErrorMessage("선택한 파일이 Stage 영역에 없습니다. ", "UnStaged file chosen error");
             }
