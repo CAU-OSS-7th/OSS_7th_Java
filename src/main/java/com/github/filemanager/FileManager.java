@@ -1182,8 +1182,8 @@ public class FileManager {
             Repository repository = builder.setGitDir(gitDir).readEnvironment().findGitDir().build(); // Repository 객체 생성
             Git git = new Git(repository);
 
-            File workDir = repository.getWorkTree();
-            Path workDirPath = Paths.get(workDir.getAbsolutePath());
+            File workDir = repository.getWorkTree(); //현재 .git 폴더의 위치 반환
+            Path workDirPath = Paths.get(workDir.getAbsolutePath()); //해당 폴더의 절대 경로 불러오기
 
 
             Status status = git.status().call(); //파일의 상태를 가져온다.
@@ -1200,7 +1200,8 @@ public class FileManager {
                     Component c = super.getTableCellRendererComponent(table, value, isSelected, hasFocus, row, column);
                     FileTableModel model = (FileTableModel) table.getModel(); //테이블의 모델 가져오기
                     File file = model.getFile(row); //각 테이블의 행에 해당하는 파일을 가져온다.
-                    Path relativePath = workDirPath.relativize(Paths.get(file.getAbsolutePath()));
+                    Path relativePath = workDirPath.relativize(Paths.get(file.getAbsolutePath())); //불러온 .git의 절대경로를
+                    //기준으로, 각 파일의 절대 경로를 상대화시킴으로써 상대 경로 반환 => 하위 폴더의 status까지 갱신할 수 있다.
 
                     if (addedFiles.contains(relativePath.toString())) { //그 파일이 added된 상태일 경우
                         c.setForeground(new Color(0,153,76)); //초록색
@@ -1228,7 +1229,7 @@ public class FileManager {
     private boolean isCommittedOrUnmodifiedFile(File file){
         try{
             Git git;
-            git = Git.open(currentFile.getParentFile());
+            git = Git.open(currentFile.getParentFile()); //(5/8) RepositoryBuilder로 변경 필요
             Status status = git.status().call();
 
             Set<String> untracked = status.getUntracked();  //Untracked 파일 이름을 받아와 비교
@@ -1253,7 +1254,7 @@ public class FileManager {
     private boolean isModifiedFile(File file) {
         try{
             Git git;
-            git = Git.open(currentFile.getParentFile());
+            git = Git.open(currentFile.getParentFile()); //(5/8) RepositoryBuilder로 변경 필요
             Status status = git.status().call();
 
             Set<String> modified = status.getModified(); // Modified 파일 이름을 받아와 비교
@@ -1274,7 +1275,7 @@ public class FileManager {
     private boolean isStagedFile(File file){
         try{
             Git git;
-            git = Git.open(currentFile.getParentFile());
+            git = Git.open(currentFile.getParentFile()); //(5/8) RepositoryBuilder로 변경 필요
             Status status = git.status().call();
             //staged 영역에 있는 경우는 2가지 존재
             Set<String> added = status.getAdded(); // 1. add 되고 수정이 없는 상태
