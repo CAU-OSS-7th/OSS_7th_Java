@@ -29,6 +29,8 @@ import java.awt.image.*;
 import java.io.*;
 import java.net.URL;
 import java.nio.channels.FileChannel;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
@@ -46,6 +48,7 @@ import org.eclipse.jgit.api.Git;
 import org.eclipse.jgit.api.Status;
 import org.eclipse.jgit.api.errors.GitAPIException;
 import org.eclipse.jgit.lib.Repository;
+import org.eclipse.jgit.lib.RepositoryBuilder;
 import org.eclipse.jgit.storage.file.FileRepositoryBuilder;
 
 /**
@@ -687,19 +690,26 @@ public class FileManager {
      * */
 
     private boolean isTreeInGitRepository() { // 현재 directory가 git repository인지 판정하는 함수, 이 조건을 충족한 뒤 git 명령어를 실행해야 한다.
-        if (currentFile == null) {
-            showErrorMessage("No location selected for new file.", "Select Location");
-            return false;
-        }
+        String[] gitCheckCommand = {"git", "status"}; //Git status 명령어를 통해 간접적으로 .git 폴더 유무 확인
+        ProcessBuilder processBuilder = new ProcessBuilder(gitCheckCommand);
+        processBuilder.directory(currentFile); //선택한 파일의 경로 반환
+        Process process;
+        int gitStatus = -1;
 
-        File[] files = currentFile.listFiles();
-        for (File file : files) {
-            if (file.getName().equals(".git")) { // 현재 디렉토리에 .git이 존재하는지 판정
+        try{
+            process = processBuilder.start(); //git status 명령어를 선택한 파일의 경로에서 실행하여 git이 있는지 확인
+            gitStatus = process.waitFor(); //만일 git status가 잘 실행됐다면 git repository에 있다는 것이고, 아니라면 에러코드를 반환
+            if (gitStatus == 0){
                 return true;
+            }else{
+                return false;
             }
+        }catch (IOException | InterruptedException e){
+            e.printStackTrace();
         }
         return false;
     }
+
 
     private void gitInitFile() { // git init 명령어을 실행하는 함수
         if (currentFile == null) {
@@ -839,7 +849,10 @@ public class FileManager {
      */
 
     private Object[][] getStagedFile(File curFile) throws IOException, GitAPIException {
-        Git git = Git.open(curFile); // 현재 파일 기준으로 git 레퍼지토리 열기
+        FileRepositoryBuilder builder = new FileRepositoryBuilder();
+        File gitDir = builder.findGitDir(curFile).getGitDir(); // .git 폴더 찾기
+        Repository repository = builder.setGitDir(gitDir).readEnvironment().findGitDir().build(); // Repository 객체 생성
+        Git git = new Git(repository);
 
         // Stage된 파일 목록 가져오기
         Status status = git.status().call();
@@ -878,18 +891,17 @@ public class FileManager {
         JLabel stagedFileLabel;
         JScrollPane commitScrollPane;
 
-        if (currentFile == null || !isFileSelectedInList) { //선택한 파일이 없으면 에러 메시지. List가 아닌 Tree에서 파일을 선택했을 경우도 포함
+        if (currentFile == null) { //선택한 파일이 없으면 에러 메시지. List가 아닌 Tree에서 파일을 선택했을 경우도 포함
             showErrorMessage("파일을 선택해주세요.", "Select File");
             return;
         }
 
-        if (isFileInGitRepository()){ //.git이 존재할 경우
+        if ((isFileSelectedInList && isFileInGitRepository()) | (!isFileSelectedInList && isTreeInGitRepository())){ //.git이 존재할 경우
             if (gitCommitPanel == null) {
                 try{
                     /*-------------------------------커밋 창 UI 구성--------------------------------- */
-
                     String[] columns = {"File", "File Status"};
-                    Object[][] data = getStagedFile(currentFile.getParentFile()); //stage된 데이터 오브젝트
+                    Object[][] data = getStagedFile(currentFile); //stage된 데이터 오브젝트
                     JPanel commitTablePanel = new JPanel(new BorderLayout());
                     commitTable = new JTable(data, columns);
                     stagedFileLabel = new JLabel("Changes to be committed:");
@@ -1138,6 +1150,7 @@ public class FileManager {
                             TreePath parentPath = findTreePath(currentFile.getParentFile());
                             DefaultMutableTreeNode parentNode = (DefaultMutableTreeNode) parentPath.getLastPathComponent();
                             showChildren(parentNode);
+                            currentFile = currentFile.getParentFile();
                         } else { //git rm 명령어가 정상적으로 실행되지 않았을 경우
                             showErrorMessage("파일을 remove하는 과정에서 오류가 발생했습니다.", "git rm error");
                         }
@@ -1158,21 +1171,20 @@ public class FileManager {
      * 탐색기의 버튼을 누를 때마다 호출됨.
      * @throws IOException
      * @throws GitAPIException
+     * @throws NullPointerException
      */
 
-    private void renderGitFileStatus() throws IOException, GitAPIException { //텍스트 색깔 렌더링 함수
+    private void renderGitFileStatus() throws IOException, GitAPIException, NullPointerException { //텍스트 색깔 렌더링 함수
 
         try {
-            Git git;
-            if (isFileSelectedInList){ //파일 목록창을 클릭하거나, 변화가 생겨 새로고침될 경우 단일 파일 선택 상태이므로 부모 경로를 찾는다.
-                if (currentFile.isFile()){ //단일 파일 선택시 렌더링 오류가 일어나는 듯하여 디렉토리가 아니라면 부모 디렉토리에서 탐색
-                    git = Git.open(currentFile.getParentFile());
-                }else{
-                    git = Git.open(currentFile);//디렉토리라면 그대로
-                }
-            }else{ //왼쪽 Tree에서 폴더를 선택할 경우, 그 폴더 내의 .git을 스캔해야 하므로 경로를 그대로 가져온다.
-                git = Git.open(currentFile);
-            }
+            FileRepositoryBuilder builder = new FileRepositoryBuilder();
+            File gitDir = builder.findGitDir(currentFile).getGitDir(); // .git 폴더 찾기
+            Repository repository = builder.setGitDir(gitDir).readEnvironment().findGitDir().build(); // Repository 객체 생성
+            Git git = new Git(repository);
+
+            File workDir = repository.getWorkTree();
+            Path workDirPath = Paths.get(workDir.getAbsolutePath());
+
 
             Status status = git.status().call(); //파일의 상태를 가져온다.
 
@@ -1181,20 +1193,24 @@ public class FileManager {
             Set<String> modifiedFiles = status.getModified(); //Tracked 파일에 변경사항이 생겼을 경우 -> 주황색
             Set<String> untrackedFiles = status.getUntracked(); //새로운 파일이 생성되거나, untracked 파일일 경우 -> 빨간색
 
+
+
             table.setDefaultRenderer(Object.class, new DefaultTableCellRenderer() { //테이블 Render를 Override하여 색상을 변경할 수 있게 한다.
                 public Component getTableCellRendererComponent(JTable table, Object value, boolean isSelected, boolean hasFocus, int row, int column) {
                     Component c = super.getTableCellRendererComponent(table, value, isSelected, hasFocus, row, column);
                     FileTableModel model = (FileTableModel) table.getModel(); //테이블의 모델 가져오기
                     File file = model.getFile(row); //각 테이블의 행에 해당하는 파일을 가져온다.
-                    if (addedFiles.contains(file.getName())) { //그 파일이 added된 상태일 경우
+                    Path relativePath = workDirPath.relativize(Paths.get(file.getAbsolutePath()));
+
+                    if (addedFiles.contains(relativePath.toString())) { //그 파일이 added된 상태일 경우
                         c.setForeground(new Color(0,153,76)); //초록색
                     }
-                    else if(modifiedFiles.contains(file.getName())){ //그 파일이 변경되었을 경우
+                    else if(modifiedFiles.contains(relativePath.toString())){ //그 파일이 변경되었을 경우
                         c.setForeground(new Color(255,128,0)); //주황색
                     }
-                    else if (changedFiles.contains(file.getName())) { //그 파일의 변경사항이 stage 되었을 경우
+                    else if (changedFiles.contains(relativePath.toString())) { //그 파일의 변경사항이 stage 되었을 경우
                         c.setForeground(new Color(0,153,76)); //초록색
-                    } else if (untrackedFiles.contains(file.getName())) { //그 파일이 untracked 상태이거나, 새로운 파일일 경우
+                    } else if (untrackedFiles.contains(relativePath.toString())) { //그 파일이 untracked 상태이거나, 새로운 파일일 경우
                         c.setForeground(Color.RED); //빨간색
                     } else {
                         c.setForeground(table.getForeground()); //그 외의 경우 (commit된 상태) 기본 색상으로 설정
@@ -1202,10 +1218,9 @@ public class FileManager {
                     return c;
                 }
             });
-        } catch (IOException | GitAPIException e) {
+        } catch (IOException | GitAPIException | NullPointerException e) {
             e.printStackTrace();
         }
-
     }
     /**
      * 단일 파일을 선택 했을 때 해당 파일이 Commited or UnModified 상태인지 확인해 주는 boolean 함수
