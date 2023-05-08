@@ -1306,7 +1306,7 @@ public class FileManager {
             Path workDirPath = Paths.get(workDir.getAbsolutePath()); //.git 이 있는 폴더의 절대 경로
             Path relativePath = workDirPath.relativize(Paths.get(file.getAbsolutePath())); // .git이 있는 폴더의 상대경로로 인자로 받은 파일의 위치를 나타내줌
 
-            Git git = Git.open(workDir.getAbsoluteFile()); //.git 파일이 있는 위치의 파일을 인자로 줌으로 jgit 사용
+            Git git = new Git(repository);
             Status status = git.status().call();
 
             Set<String> modified = status.getModified(); // Modified 파일 이름을 받아와 비교
@@ -1335,8 +1335,7 @@ public class FileManager {
             Path workDirPath = Paths.get(workDir.getAbsolutePath()); //.git 이 있는 폴더의 절대 경로
             Path relativePath = workDirPath.relativize(Paths.get(file.getAbsolutePath())); // .git이 있는 폴더의 상대경로로 인자로 받은 파일의 위치를 나타내줌
 
-            Git git;
-            git = Git.open(workDir.getAbsoluteFile()); //.git 파일이 있는 위치의 파일을 인자로 줌으로 jgit 사용
+            Git git = new Git(repository);
             Status status = git.status().call();
             //staged 영역에 있는 경우는 2가지 존재
             Set<String> added = status.getAdded(); // 1. add 되고 수정이 없는 상태
