@@ -10,7 +10,8 @@ A java/swing basic File Manager in MacOS. The original project is [here](https:/
 
 Before you use it, you should install Java 11 or higher version.
 
-Clone this repository, and just execute filemanager.jar or build the repository in your IDE(Intelij IDEA).
+Clone this repository, build the repository in your IDE(Intelij IDEA) or build the repository by the command below.
+"java -jar file-manager.jar"
 
 ![image](https://user-images.githubusercontent.com/53044069/236477124-1bc5c460-9df3-432d-a684-e2a01c44e65e.png)
 
