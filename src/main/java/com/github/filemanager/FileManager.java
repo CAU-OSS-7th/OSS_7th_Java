@@ -800,6 +800,11 @@ public class FileManager {
             return;
         }
 
+        if (currentFile.isDirectory()){
+            showErrorMessage("디렉토리가 아닌 파일을 선택해주세요.", "Select File");
+            return;
+        }
+
         // ----------------------------------------확인 바람------------------------------------------
 //          파일을 선택할 경우, directory가 아니므로 기존 isInGitRepository() 실행 시 Not a directory Error 발생.
 //          따라서, git status를 통해 선택한 파일이 git repository에 있는지 확인 후 add 실행.
@@ -811,6 +816,26 @@ public class FileManager {
 
         if (isFileInGitRepository()) { //현재 디렉토리에 .git이 있는 경우에만 add 실행가능하게 함.
             try{
+                FileRepositoryBuilder builder = new FileRepositoryBuilder();
+                File gitDir = builder.findGitDir(currentFile).getGitDir(); // .git 폴더 찾기
+                Repository repository = builder.setGitDir(gitDir).readEnvironment().findGitDir().build(); // Repository 객체 생성
+                Git git = new Git(repository);
+
+                // Stage된 파일 목록 가져오기
+                Status status = git.status().call();
+                Set<String> untracked = status.getUntracked();
+                Set<String> modified = status.getModified(); //변경사항이 stage되면 changed로 상태가 바뀌므로 따로 가져옴
+
+                File workDir = repository.getWorkTree(); //현재 .git 폴더의 위치 반환
+                Path workDirPath = Paths.get(workDir.getAbsolutePath()); //해당 폴더의 절대 경로 불러오기
+                Path relativePath = workDirPath.relativize(Paths.get(currentFile.getAbsolutePath()));
+
+                if (!untracked.contains(relativePath.toString()) && !modified.contains(relativePath.toString())){
+                    showErrorMessage("Stage 가능한 파일이 아닙니다.", "Not a stageable File");
+                    return;
+                }
+
+
                 int result = JOptionPane.showConfirmDialog(gui, "해당 파일을 stage 하시겠습니까? '예'를 누르면 등록됩니다.", "git add", JOptionPane.ERROR_MESSAGE);
 
                 if (result == JOptionPane.OK_OPTION) { // "예" 클릭 시 git add 명령어 실행
@@ -833,7 +858,7 @@ public class FileManager {
                         showErrorMessage("파일을 Stage하는 과정에서 오류가 발생했습니다.","git add error");
                     }
                 }
-            } catch (InterruptedException | IOException e){
+            } catch (InterruptedException | IOException | GitAPIException e){
                 e.printStackTrace();
             }
         }else{ //.git이 존재하지 않는 경우 (git status 명령어가 실패했을 경우)
