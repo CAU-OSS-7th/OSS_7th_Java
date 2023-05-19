@@ -144,6 +144,17 @@ public class FileManager {
     private JButton gitRestoreFile; // git restore
     private JButton gitRestoreStagedFile; // git restore --staged
 
+    /* Project 2에서 탐색기에 새로 추가한 git 버튼 */
+    private JButton gitCommitHistoryFile; // git commit history
+    private JButton gitCloneFile; // git clone
+    private JButton gitBranchManagerFile; // git Branch Manager
+    private JButton gitCreateBranchFile; // git branch
+
+    /* git branch manager 팝업창에서 사용할 버튼 */
+    private JButton gitMergeBranchFile; // git merge
+    private JButton gitDeleteBranchFile; // git branch -D
+    private JButton gitRenameBranchFile; // git branch --move
+    private JButton gitCheckoutBranchFile; // git checkout
 
     /* File details. */
     private JLabel fileName;
@@ -470,17 +481,59 @@ public class FileManager {
             readable = new JCheckBox("Read  ");
             readable.setMnemonic('a');
             // readable.setEnabled(false);
-            toolBar.add(readable);
+            // toolBar.add(readable);
 
             writable = new JCheckBox("Write  ");
             writable.setMnemonic('w');
             // writable.setEnabled(false);
-            toolBar.add(writable);
+            // toolBar.add(writable);
 
             executable = new JCheckBox("Execute");
             executable.setMnemonic('x');
             // executable.setEnabled(false);
-            toolBar.add(executable);
+            // toolBar.add(executable);
+
+            toolBar.addSeparator();
+
+            // 9. create git branch 버튼
+           gitCreateBranchFile = new JButton("Git create branch");
+           gitCreateBranchFile.setMnemonic('B');
+           gitCreateBranchFile.addActionListener(new ActionListener() {
+               public void actionPerformed(ActionEvent ae) {
+                   // gitCreateBranchFile();
+               }
+           });
+           toolBar.add(gitCreateBranchFile);
+
+           // 10. git branch manager 팝업창 호출
+            gitBranchManagerFile = new JButton("Git branch manager");
+            gitBranchManagerFile.setMnemonic('B');
+            gitBranchManagerFile.addActionListener(new ActionListener() {
+                public void actionPerformed(ActionEvent ae) {
+                    // gitBranchManagerFile();
+                }
+            });
+            toolBar.add(gitBranchManagerFile);
+
+            // 11. git clone 버튼
+            gitCloneFile = new JButton("Git clone");
+            gitCloneFile.setMnemonic('C');
+            gitCloneFile.addActionListener(new ActionListener() {
+                public void actionPerformed(ActionEvent ae) {
+                    // gitCloneFile();
+                }
+            });
+            toolBar.add(gitCloneFile);
+
+            // 12. git commit history 조회
+            gitCommitHistoryFile = new JButton("Git commit history");
+            gitCommitHistoryFile.setMnemonic('H');
+            gitCommitHistoryFile.addActionListener(new ActionListener() {
+                public void actionPerformed(ActionEvent ae) {
+                    // gitCommitHistoryFile();
+                }
+            });
+            toolBar.add(gitCommitHistoryFile);
 
             JPanel fileView = new JPanel(new BorderLayout(3, 3));
 
