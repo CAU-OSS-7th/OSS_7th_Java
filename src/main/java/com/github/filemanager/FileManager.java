@@ -31,10 +31,8 @@ import java.net.URL;
 import java.nio.channels.FileChannel;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.util.ArrayList;
-import java.util.Date;
+import java.util.*;
 import java.util.List;
-import java.util.Set;
 import javax.imageio.ImageIO;
 import javax.swing.*;
 import javax.swing.border.*;
@@ -150,6 +148,7 @@ public class FileManager {
     private JButton gitCloneFile; // git clone
     private JButton gitBranchManagerFile; // git Branch Manager
     private JButton gitCreateBranchFile; // git branch
+    private JButton gitCurrentBranch; // git current branch
 
     /* git branch manager 팝업창에서 사용할 버튼 */
     private JButton gitMergeBranchFile; // git merge
@@ -210,8 +209,10 @@ public class FileManager {
                     setFileDetails(((FileTableModel) table.getModel()).getFile(row));
                     isFileSelectedInList = true; //리스트에서 파일을 선택했으므로 true
                     if (isFileInGitRepository()){
+                        System.out.println("git repository에 있는 파일을 선택했습니다.");
                         try{
                             renderGitFileStatus(); //일관성 유지를 위해 선택한 파일이 바뀔 때마다 렌더링한다. (성능은 감소할 수 있음)
+                            // renderGitBranchStatus(); // 왼쪽 트리에서 선택한 디렉토리가 바뀔 때마다 branch명 갱신을 위해 렌더링한다.
                         }catch(IOException | GitAPIException e){
                             e.printStackTrace();
                         }
@@ -240,6 +241,9 @@ public class FileManager {
                         }catch(IOException | GitAPIException e){
                             e.printStackTrace();
                         }
+                    } else { // Project 2 추가: git repository가 아닌 디렉토리를 선택했을 때 current branch가 없다고 표시해주기 위함
+                        System.out.println("select non-git repository");
+                        gitCurrentBranch.setText("Current Git Branch: Not a git repo");
                     }
                 }
             };
@@ -536,10 +540,18 @@ public class FileManager {
             });
             toolBar.add(gitCommitHistoryFile);
 
+            // current branch를 표시해줄 공간 생성
+            JToolBar branchToolBar = new JToolBar();
+            branchToolBar.setFloatable(false);
+            gitCurrentBranch = new JButton("Current Git Branch: Not a git repo");
+            gitCurrentBranch.setBorder(BorderFactory.createEmptyBorder(4, 4, 4, 4)); // 강조 효과
+            branchToolBar.add(gitCurrentBranch);
+
             JPanel fileView = new JPanel(new BorderLayout(3, 3));
 
             fileView.add(toolBar, BorderLayout.NORTH);
-            fileView.add(fileMainDetails, BorderLayout.CENTER);
+            fileView.add(branchToolBar, BorderLayout.CENTER);
+            fileView.add(fileMainDetails, BorderLayout.SOUTH);
 
             detailView.add(fileView, BorderLayout.SOUTH);
 
@@ -1291,6 +1303,7 @@ public class FileManager {
             showErrorMessage("(현재 폴더 또는 상위 폴더 중 일부가) 깃 저장소가 아닙니다.","git rm --cached error");
         }
     }
+
     /**
      * 파일 목록에 각 파일들의 status에 따라 테이블의 색상을 다르게 설정하는 렌더링 함수. 디렉토리에서 폴더를 클릭하거나, 파일을 선택하거나,
      * 탐색기의 버튼을 누를 때마다 호출됨.
@@ -1300,16 +1313,19 @@ public class FileManager {
      */
 
     private void renderGitFileStatus() throws IOException, GitAPIException, NullPointerException { //텍스트 색깔 렌더링 함수
-
         try {
             FileRepositoryBuilder builder = new FileRepositoryBuilder();
             File gitDir = builder.findGitDir(currentFile).getGitDir(); // .git 폴더 찾기
             Repository repository = builder.setGitDir(gitDir).readEnvironment().findGitDir().build(); // Repository 객체 생성
             Git git = new Git(repository);
 
+            System.out.println(repository.getBranch()); // Project 2에서 추가: 함수 호출마다 현재 branch명 출력
+            if(gitCurrentBranch != null) { // null이 아닐 경우에만 branch명 갱신
+                gitCurrentBranch.setText("Current Git Branch: " + repository.getBranch()); // branch명 갱신
+            }
+
             File workDir = repository.getWorkTree(); //현재 .git 폴더의 위치 반환
             Path workDirPath = Paths.get(workDir.getAbsolutePath()); //해당 폴더의 절대 경로 불러오기
-
 
             Status status = git.status().call(); //파일의 상태를 가져온다.
 
