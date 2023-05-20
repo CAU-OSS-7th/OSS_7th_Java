@@ -1524,12 +1524,12 @@ public class FileManager {
      * git branch 실행 로직
      */
     private void gitCreateBranchFile(){
-        if (currentFile == null) {
+        if (currentFile == null) { // 파일 선택되지 않았을 때 에러
             showErrorMessage("No location selected for new file.", "Select Location");
             return;
         }
 
-        if(!((isFileSelectedInList && isFileInGitRepository()) || (!isFileSelectedInList && isTreeInGitRepository()))) {
+        if(!((isFileSelectedInList && isFileInGitRepository()) || (!isFileSelectedInList && isTreeInGitRepository()))) { // git repository가 아닌 경우 에러
             showErrorMessage("이 디렉토리는 git repository가 아닙니다.", "Not Git Repository");
             return;
         }
@@ -1565,7 +1565,7 @@ public class FileManager {
             @Override
             public void actionPerformed(ActionEvent e) {
                 String name= textField.getText();
-                if (name.isEmpty()) { // branch명 공란검사
+                if (name.isEmpty()) { // branch명 공란 검사
                     mvFrame.dispose();
                     showErrorMessage("branch명은 공백이 될 수 없습니다.", "git branch error");
                     return;
@@ -1579,15 +1579,16 @@ public class FileManager {
                     mvFrame.dispose();
                     String[] gitBrCommand = {"git", "branch", name};
                     ProcessBuilder processBuilder = new ProcessBuilder(gitBrCommand);
-                    if(currentFile.isDirectory()){
+
+                    if(currentFile.isDirectory()){ // 현재 디렉토리 -> 바로 실행
                         processBuilder.directory(currentFile);
-                    } else {
+                    } else { // 현재 파일 -> 파일의 부모 디렉토리 기준으로 실행
                         processBuilder.directory(currentFile.getParentFile());
                     }
                     Process process = processBuilder.start();
 
                     int mvStatus = process.waitFor(); // git branch 명령어 정상 실행 여부 판단
-                    if (mvStatus == 0) { // git branch 명령어가 정상적으로 실행되어 status가 0일 경우
+                    if (mvStatus == 0) { // git branch 명령어가 정상적으로 실행될 경우
                         JOptionPane.showMessageDialog(gui, "성공적으로 branch를 생성했습니다.");
                         System.out.println("new branch name: " + name);
                     } else { //git branch 명령어가 정상적으로 실행되지 않았을 경우
@@ -1607,12 +1608,12 @@ public class FileManager {
         });
     }
 
-    private boolean ifSameNameExistInBranch(String name){ // Jgit을 활용하여 현재 git repository의 branch 중 name이 존재하는지 판단하기 위한 함수
+    private boolean ifSameNameExistInBranch(String name){ // 현재 git repository의 branch 중 name이 존재하는지 판단하기 위한 함수
         try {
             Git git;
-            if(currentFile.isDirectory()){
+            if(currentFile.isDirectory()){ // 현재 디렉토리 -> 바로 실행
                 git = Git.open(currentFile);
-            } else {
+            } else { // 현재 파일 -> 파일의 부모 디렉토리 기준으로 실행
                 git = Git.open(currentFile.getParentFile());
             }
             List<Ref> call = git.branchList().call();
