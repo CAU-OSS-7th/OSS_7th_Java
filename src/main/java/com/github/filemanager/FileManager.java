@@ -515,7 +515,7 @@ public class FileManager {
             gitBranchManagerFile.setMnemonic('B');
             gitBranchManagerFile.addActionListener(new ActionListener() {
                 public void actionPerformed(ActionEvent ae) {
-                    // gitBranchManagerFile();
+                    gitBranchManagerFile();
                 }
             });
             toolBar.add(gitBranchManagerFile);
@@ -1622,6 +1622,94 @@ public class FileManager {
                 mvFrame.dispose();
             }
         });
+    }
+
+    private void gitBranchManagerFile() { // 현재 git repository의 branch 목록으로 table를 생성하는 함수, 단 branch 객체는 독립적으로 클릭 가능해야 한다.
+        if (currentFile == null) { // 파일 선택되지 않았을 때 에러
+            showErrorMessage("No location selected for new file.", "Select Location");
+            return;
+        }
+
+        if (!((isFileSelectedInList && isFileInGitRepository()) || (!isFileSelectedInList && isTreeInGitRepository()))) { // git repository가 아닌 경우 에러
+            showErrorMessage("이 디렉토리는 git repository가 아닙니다.", "Not Git Repository");
+            return;
+        }
+
+        try {
+            Git git;
+            if (currentFile.isDirectory()) { // 현재 디렉토리 -> 바로 실행
+                git = Git.open(currentFile);
+            } else { // 현재 파일 -> 파일의 부모 디렉토리 기준으로 실행
+                git = Git.open(currentFile.getParentFile());
+            }
+
+            // branch 목록에 대한 정보를 2차원 배열로 가져오기
+            List<Ref> call = git.branchList().call();
+            String[] columnNames = {"branch name", "commit id"};
+            String[][] rowData = new String[call.size()][2];
+            int i = 0;
+            for (Ref ref : call) {
+                rowData[i][0] = ref.getName().substring(11);
+                rowData[i][1] = ref.getObjectId().getName();
+                i++;
+            }
+
+            // 테이블 하위에 위치할 버튼 3개 추가
+            JButton renameBranchButton = new JButton("Rename Branch");
+            JButton deleteBranchButton = new JButton("Delete Branch");
+            JButton mergeBranchButton = new JButton("Merge Branch");
+            JButton checkoutButton = new JButton("Checkout Branch");
+            JPanel buttonPanel = new JPanel();
+            buttonPanel.add(renameBranchButton);
+            buttonPanel.add(deleteBranchButton);
+            buttonPanel.add(mergeBranchButton);
+            buttonPanel.add(checkoutButton);
+
+            // 버튼 동작 구현
+            renameBranchButton.addActionListener(new ActionListener() { // rename branch 버튼 클릭 시
+                @Override
+                public void actionPerformed(ActionEvent e) {
+                    // renameGitBranch();
+                }
+            });
+
+            deleteBranchButton.addActionListener(new ActionListener() { // delete branch 버튼 클릭 시
+                @Override
+                public void actionPerformed(ActionEvent e) {
+                    // deleteGitBranch();
+                }
+            });
+
+            mergeBranchButton.addActionListener(new ActionListener() { // merge branch 버튼 클릭 시
+                @Override
+                public void actionPerformed(ActionEvent e) {
+                    // mergeGitBranch();
+                }
+            });
+
+            checkoutButton.addActionListener(new ActionListener() { // checkout branch 버튼 클릭 시
+                @Override
+                public void actionPerformed(ActionEvent e) {
+                    // checkoutGitBranch();
+                }
+            });
+
+            // branch 목록 table 생성
+            JTable table = new JTable(rowData, columnNames);
+            table.setEnabled(true); // 객체 독립적으로 선택 가능
+            JScrollPane scrollPane = new JScrollPane(table);
+            scrollPane.setPreferredSize(new Dimension(400, 200));
+
+            // 둘을 결합하는 panel 생성
+            JPanel panel = new JPanel(new BorderLayout());
+            panel.add(scrollPane, BorderLayout.CENTER);
+            panel.add(buttonPanel, BorderLayout.SOUTH);
+
+            // branchmanager 화면에 출력
+            JOptionPane.showMessageDialog(gui, panel, "branch manager", JOptionPane.INFORMATION_MESSAGE);
+        } catch (IOException | GitAPIException e) {
+            e.printStackTrace();
+        }
     }
 
     private boolean ifSameNameExistInBranch(String name){ // 현재 git repository의 branch 중 name이 존재하는지 판단하기 위한 함수
