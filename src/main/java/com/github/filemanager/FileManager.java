@@ -1624,20 +1624,20 @@ public class FileManager {
         });
     }
 
-    private void gitBranchManagerFile(){ // 현재 git repository의 branch 목록으로 table를 생성하는 함수, 단 branch 객체는 독립적으로 클릭 가능해야 한다.
+    private void gitBranchManagerFile() { // 현재 git repository의 branch 목록으로 table를 생성하는 함수, 단 branch 객체는 독립적으로 클릭 가능해야 한다.
         if (currentFile == null) { // 파일 선택되지 않았을 때 에러
             showErrorMessage("No location selected for new file.", "Select Location");
             return;
         }
 
-        if(!((isFileSelectedInList && isFileInGitRepository()) || (!isFileSelectedInList && isTreeInGitRepository()))) { // git repository가 아닌 경우 에러
+        if (!((isFileSelectedInList && isFileInGitRepository()) || (!isFileSelectedInList && isTreeInGitRepository()))) { // git repository가 아닌 경우 에러
             showErrorMessage("이 디렉토리는 git repository가 아닙니다.", "Not Git Repository");
             return;
         }
 
         try {
             Git git;
-            if(currentFile.isDirectory()){ // 현재 디렉토리 -> 바로 실행
+            if (currentFile.isDirectory()) { // 현재 디렉토리 -> 바로 실행
                 git = Git.open(currentFile);
             } else { // 현재 파일 -> 파일의 부모 디렉토리 기준으로 실행
                 git = Git.open(currentFile.getParentFile());
@@ -1707,7 +1707,7 @@ public class FileManager {
 
             // branchmanager 화면에 출력
             JOptionPane.showMessageDialog(gui, panel, "branch manager", JOptionPane.INFORMATION_MESSAGE);
-        }catch (IOException | GitAPIException e){
+        } catch (IOException | GitAPIException e) {
             e.printStackTrace();
         }
     }
