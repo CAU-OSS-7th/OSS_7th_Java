@@ -47,6 +47,7 @@ import org.apache.commons.io.FileUtils;
 import org.eclipse.jgit.api.Git;
 import org.eclipse.jgit.api.Status;
 import org.eclipse.jgit.api.errors.GitAPIException;
+import org.eclipse.jgit.lib.Ref;
 import org.eclipse.jgit.lib.Repository;
 import org.eclipse.jgit.lib.RepositoryBuilder;
 import org.eclipse.jgit.storage.file.FileRepositoryBuilder;
@@ -500,7 +501,7 @@ public class FileManager {
            gitCreateBranchFile.setMnemonic('B');
            gitCreateBranchFile.addActionListener(new ActionListener() {
                public void actionPerformed(ActionEvent ae) {
-                   // gitCreateBranchFile();
+                    gitCreateBranchFile();
                }
            });
            toolBar.add(gitCreateBranchFile);
@@ -1518,6 +1519,115 @@ public class FileManager {
         }
 
     }
+
+    /**
+     * git branch 실행 로직
+     */
+    private void gitCreateBranchFile(){
+        if (currentFile == null) { // 파일 선택되지 않았을 때 에러
+            showErrorMessage("No location selected for new file.", "Select Location");
+            return;
+        }
+
+        if(!((isFileSelectedInList && isFileInGitRepository()) || (!isFileSelectedInList && isTreeInGitRepository()))) { // git repository가 아닌 경우 에러
+            showErrorMessage("이 디렉토리는 git repository가 아닙니다.", "Not Git Repository");
+            return;
+        }
+
+        JPanel mvPanel = new JPanel(new GridLayout(1, 4));
+        JLabel branchname = new JLabel(" new branch name:");
+        branchname.setPreferredSize(new Dimension(50, 20));
+
+        JTextField textField = new JTextField();
+        textField.setPreferredSize(new Dimension(100, 20));
+        mvPanel.add(branchname);
+        mvPanel.add(textField);
+        mvPanel.setPreferredSize(new Dimension(300, 20));
+
+        //동작을 구현할 buttonPanel
+        JButton okButton = new JButton("Ok");
+        JButton cancelButton = new JButton("Cancel");
+        JPanel buttonPanel = new JPanel(new GridLayout());
+        buttonPanel.add(cancelButton);
+        buttonPanel.add(okButton);
+
+        // Panel들을 포함할 Frame
+        JFrame mvFrame = new JFrame();
+        mvFrame.setLayout(new BorderLayout());
+        mvFrame.add(mvPanel, BorderLayout.CENTER);
+        mvFrame.add(buttonPanel, BorderLayout.SOUTH);
+        mvFrame.setVisible(true);
+        mvFrame.pack();
+        mvFrame.setLocationRelativeTo(null);
+
+        // okButton 동작. 공란과 이미 존재하는 브랜치에 대한 검사. 이상없을 시 git branch 명령어 실행
+        okButton.addActionListener(new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                String name= textField.getText();
+                if (name.isEmpty()) { // branch명 공란 검사
+                    mvFrame.dispose();
+                    showErrorMessage("branch명은 공백이 될 수 없습니다.", "git branch error");
+                    return;
+                }
+                if (ifSameNameExistInBranch(name)) {// 이미 git에 존재하는 branch인지 검사
+                    mvFrame.dispose();
+                    showErrorMessage("이미 존재하는 branch명입니다.", "git branch error");
+                    return;
+                }
+                try { // git branch 명령어 실행
+                    mvFrame.dispose();
+                    String[] gitBrCommand = {"git", "branch", name};
+                    ProcessBuilder processBuilder = new ProcessBuilder(gitBrCommand);
+
+                    if(currentFile.isDirectory()){ // 현재 디렉토리 -> 바로 실행
+                        processBuilder.directory(currentFile);
+                    } else { // 현재 파일 -> 파일의 부모 디렉토리 기준으로 실행
+                        processBuilder.directory(currentFile.getParentFile());
+                    }
+                    Process process = processBuilder.start();
+
+                    int mvStatus = process.waitFor(); // git branch 명령어 정상 실행 여부 판단
+                    if (mvStatus == 0) { // git branch 명령어가 정상적으로 실행될 경우
+                        JOptionPane.showMessageDialog(gui, "성공적으로 branch를 생성했습니다.");
+                        System.out.println("new branch name: " + name);
+                    } else { //git branch 명령어가 정상적으로 실행되지 않았을 경우
+                        showErrorMessage("branch 생성 중 오류가 발생했습니다.", "git branch error");
+                    }
+                } catch (InterruptedException | IOException e2) {
+                    e2.printStackTrace();
+                }
+            }
+        });
+
+        cancelButton.addActionListener(new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                mvFrame.dispose();
+            }
+        });
+    }
+
+    private boolean ifSameNameExistInBranch(String name){ // 현재 git repository의 branch 중 name이 존재하는지 판단하기 위한 함수
+        try {
+            Git git;
+            if(currentFile.isDirectory()){ // 현재 디렉토리 -> 바로 실행
+                git = Git.open(currentFile);
+            } else { // 현재 파일 -> 파일의 부모 디렉토리 기준으로 실행
+                git = Git.open(currentFile.getParentFile());
+            }
+            List<Ref> call = git.branchList().call();
+            for (Ref ref : call) {
+                if (ref.getName().equals("refs/heads/"+name)) {
+                    return true;
+                }
+            }
+        }catch (IOException | GitAPIException e){
+            e.printStackTrace();
+        }
+        return false;
+    }
+
     private void showErrorMessage(String errorMessage, String errorTitle) {
         JOptionPane.showMessageDialog(gui, errorMessage, errorTitle, JOptionPane.ERROR_MESSAGE);
     }
