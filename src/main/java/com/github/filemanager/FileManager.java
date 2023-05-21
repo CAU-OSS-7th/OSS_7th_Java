@@ -1634,12 +1634,10 @@ public class FileManager {
         }
 
         try {
-            Git git;
-            if (currentFile.isDirectory() && !isFileSelectedInList) { // 현재 파일이 디렉토리이며 중앙탐색기에서 파일이 선택되지 않음 -> 바로 실행
-                git = Git.open(currentFile);
-            } else { // 중앙탐색기에서 파일이 선택된 모든 경우 -> 좌측 tree에 선택된 부모 디렉토리 기준으로 실행
-                git = Git.open(currentFile.getParentFile());
-            }
+            FileRepositoryBuilder builder = new FileRepositoryBuilder();
+            File gitDir = builder.findGitDir(currentFile).getGitDir(); // .git 폴더 찾기
+            Repository repository = builder.setGitDir(gitDir).readEnvironment().findGitDir().build(); // Repository 객체 생성
+            Git git = new Git(repository);
 
             // branch 목록에 대한 정보를 2차원 배열로 가져오기
             List<Ref> call = git.branchList().call();
@@ -1712,12 +1710,10 @@ public class FileManager {
 
     private boolean ifSameNameExistInBranch(String name){ // 현재 git repository의 branch 중 name이 존재하는지 판단하기 위한 함수
         try {
-            Git git;
-            if(currentFile.isDirectory()){ // 현재 디렉토리 -> 바로 실행
-                git = Git.open(currentFile);
-            } else { // 현재 파일 -> 파일의 부모 디렉토리 기준으로 실행
-                git = Git.open(currentFile.getParentFile());
-            }
+            FileRepositoryBuilder builder = new FileRepositoryBuilder();
+            File gitDir = builder.findGitDir(currentFile).getGitDir(); // .git 폴더 찾기
+            Repository repository = builder.setGitDir(gitDir).readEnvironment().findGitDir().build(); // Repository 객체 생성
+            Git git = new Git(repository);
             List<Ref> call = git.branchList().call();
             for (Ref ref : call) {
                 if (ref.getName().equals("refs/heads/"+name)) {
