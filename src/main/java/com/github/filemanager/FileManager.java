@@ -209,10 +209,8 @@ public class FileManager {
                     setFileDetails(((FileTableModel) table.getModel()).getFile(row));
                     isFileSelectedInList = true; //리스트에서 파일을 선택했으므로 true
                     if (isFileInGitRepository()){
-                        System.out.println("git repository에 있는 파일을 선택했습니다.");
                         try{
                             renderGitFileStatus(); //일관성 유지를 위해 선택한 파일이 바뀔 때마다 렌더링한다. (성능은 감소할 수 있음)
-                            // renderGitBranchStatus(); // 왼쪽 트리에서 선택한 디렉토리가 바뀔 때마다 branch명 갱신을 위해 렌더링한다.
                         }catch(IOException | GitAPIException e){
                             e.printStackTrace();
                         }
@@ -242,7 +240,7 @@ public class FileManager {
                             e.printStackTrace();
                         }
                     } else { // Project 2 추가: git repository가 아닌 디렉토리를 선택했을 때 current branch가 없다고 표시해주기 위함
-                        System.out.println("select non-git repository");
+                        System.out.println("select non-git repository on the tree");
                         gitCurrentBranch.setText("Current Git Branch: Not a git repo");
                     }
                 }
@@ -1319,7 +1317,7 @@ public class FileManager {
             Repository repository = builder.setGitDir(gitDir).readEnvironment().findGitDir().build(); // Repository 객체 생성
             Git git = new Git(repository);
 
-            System.out.println(repository.getBranch()); // Project 2에서 추가: 함수 호출마다 현재 branch명 출력
+            System.out.println("Branch: " + repository.getBranch()); // Project 2에서 추가: 함수 호출마다 현재 branch명 출력
             if(gitCurrentBranch != null) { // null이 아닐 경우에만 branch명 갱신
                 gitCurrentBranch.setText("Current Git Branch: " + repository.getBranch()); // branch명 갱신
             }
@@ -1637,9 +1635,9 @@ public class FileManager {
 
         try {
             Git git;
-            if (currentFile.isDirectory()) { // 현재 디렉토리 -> 바로 실행
+            if (currentFile.isDirectory() && !isFileSelectedInList) { // 현재 파일이 디렉토리이며 중앙탐색기에서 파일이 선택되지 않음 -> 바로 실행
                 git = Git.open(currentFile);
-            } else { // 현재 파일 -> 파일의 부모 디렉토리 기준으로 실행
+            } else { // 중앙탐색기에서 파일이 선택된 모든 경우 -> 좌측 tree에 선택된 부모 디렉토리 기준으로 실행
                 git = Git.open(currentFile.getParentFile());
             }
 
@@ -1654,7 +1652,7 @@ public class FileManager {
                 i++;
             }
 
-            // 테이블 하위에 위치할 버튼 3개 추가
+            // 테이블 하위에 위치할 버튼 4개 추가
             JButton renameBranchButton = new JButton("Rename Branch");
             JButton deleteBranchButton = new JButton("Delete Branch");
             JButton mergeBranchButton = new JButton("Merge Branch");
