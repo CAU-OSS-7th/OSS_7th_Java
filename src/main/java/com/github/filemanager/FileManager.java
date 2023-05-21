@@ -1885,14 +1885,22 @@ public class FileManager {
         return created;
     }
     private void gitCloneFile(){
+        /*
+        1.git clone 버튼을 누르면 나오는 공통된 창을 만들기.
+        2.public, private Panel각기 만들어주고 공란 예외처리
+        3.ok 버튼이 눌렸을 때 public, private 중 선택된 기능함수 호출.
 
-        if (currentFile == null || isFileSelectedInList) {//1.디렉토리를 선택하지 않았을 경우, 별도행위없이 함수종료
-            showErrorMessage("좌측에서 디렉토리를 선택해주세요.", "Select Directory");
+        실행 전 파일 선택 예외처리 수정 필요해보임.
+        */
+
+        if (currentFile == null || !currentFile.isDirectory()) {//1.디렉토리를 선택하지 않았을 경우, 별도행위없이 함수종료
+            showErrorMessage("디렉토리를 선택해주세요.", "Select Directory");
             return;
         }
+        //clone 버튼 클릭시 띄울 프레임
+        JFrame cloneFrame = new JFrame("local directory: " + currentFile.getName());cloneFrame.setLayout(new BorderLayout());
 
-        JFrame cloneFrame = new JFrame();cloneFrame.setLayout(new BorderLayout());
-
+        //public과 private 중 어떤 유형의 레포를 clone할 지 선택하고 유형에 따른 입력값을 달리하기 위한 옵션구현.
         JPanel publicPanel, privatePanel, buttonPanel, jpRadioButtons;
         jpRadioButtons = new JPanel(); JRadioButton jbrPublic = new JRadioButton("public"), jbrPrivate = new JRadioButton("private");
         jpRadioButtons.setLayout(new GridLayout(2, 1)); jpRadioButtons.setSize(30, 10);
@@ -1903,28 +1911,31 @@ public class FileManager {
         JLabel privateUrlLabel = new JLabel("Github Repo Address");
         JLabel idLabel = new JLabel("Id:");
         JLabel tokenLabel = new JLabel("Access Token:");
-        JTextField publicUrlTextField = new JTextField(); publicUrlTextField.setSize(20, 300);
-        JTextField privateUrlTextField = new JTextField(); privateUrlTextField.setSize(20, 300);
-        JTextField idTextField = new JTextField(); idTextField.setSize(20, 300);
-        JTextField tokenTextField = new JTextField(); tokenTextField.setSize(20, 300);
+        JTextField publicUrlTextField = new JTextField(); publicUrlTextField.setSize(100, 10);
+        JTextField privateUrlTextField = new JTextField(); privateUrlTextField.setPreferredSize(new Dimension(100, 20));
+        JTextField idTextField = new JTextField(); idTextField.setPreferredSize(new Dimension(100, 20));
+        JTextField tokenTextField = new JTextField(); tokenTextField.setPreferredSize(new Dimension(100, 20));
 
-        publicPanel = new JPanel(); publicPanel.setLayout(new GridLayout(1, 2));
-        publicPanel.add(publicUrlLabel); publicPanel.add(publicUrlTextField);
+        //public repo를 clone하는 경우
+        publicPanel = new JPanel(); publicPanel.setLayout(new BorderLayout());
+        publicPanel.add(publicUrlLabel, BorderLayout.WEST); publicPanel.add(publicUrlTextField, BorderLayout.CENTER);
 
-        privatePanel = new JPanel(); privatePanel.setLayout(new GridLayout(3, 2));
-        privatePanel.add(privateUrlLabel); privatePanel.add(privateUrlTextField);
-        privatePanel.add(idLabel); privatePanel.add(idTextField);
-        privatePanel.add(tokenLabel); privatePanel.add(tokenTextField);
+        //private repo를 clone하는 경우
+        privatePanel = new JPanel(); privatePanel.setLayout(new BorderLayout());
+        JPanel labelPanel = new JPanel(); labelPanel.setLayout(new GridLayout(3, 1));
+        JPanel inputPanel = new JPanel(); inputPanel.setLayout(new GridLayout(3, 1));
+        labelPanel.add(privateUrlLabel); labelPanel.add(idLabel); labelPanel.add(tokenLabel);
+        inputPanel.add(privateUrlTextField); inputPanel.add(idTextField); inputPanel.add(tokenTextField);
+        privatePanel.add(labelPanel, BorderLayout.WEST); privatePanel.add(inputPanel, BorderLayout.CENTER);
 
         JButton okButton = new JButton("Ok"), cancelButton = new JButton("Cancle");
         buttonPanel = new JPanel(); buttonPanel.add(okButton); buttonPanel.add(cancelButton);
 
         cloneFrame.add(publicPanel, BorderLayout.CENTER);
         cloneFrame.add(jpRadioButtons, BorderLayout.WEST); cloneFrame.add(buttonPanel, BorderLayout.SOUTH);
-        cloneFrame.setVisible(true); cloneFrame.setSize(1000, 500);
-        cloneFrame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
+        cloneFrame.setVisible(true); cloneFrame.setLocationRelativeTo(null); cloneFrame.setPreferredSize(new Dimension(500, 120));
         cloneFrame.pack();
-        jbrPublic.addActionListener(new ActionListener() {
+        jbrPublic.addActionListener(new ActionListener() {//public 입력창으로 변환.
             @Override
             public void actionPerformed(ActionEvent e) {
                 cloneFrame.remove(privatePanel);
@@ -1932,7 +1943,7 @@ public class FileManager {
                 cloneFrame.pack(); cloneFrame.repaint();
             }
         });
-        jbrPrivate.addActionListener(new ActionListener() {
+        jbrPrivate.addActionListener(new ActionListener() {//private 입력창으로 변환.
             @Override
             public void actionPerformed(ActionEvent e) {
                 cloneFrame.remove(publicPanel);
