@@ -1670,6 +1670,12 @@ public class FileManager {
             buttonPanel.add(mergeBranchButton);
             buttonPanel.add(checkoutButton);
 
+            // branch 목록 table 생성
+            JTable table = new JTable(rowData, columnNames);
+            table.setEnabled(true); // 객체 독립적으로 선택 가능
+            JScrollPane scrollPane = new JScrollPane(table);
+            scrollPane.setPreferredSize(new Dimension(400, 200));
+
             // 버튼 동작 구현
             renameBranchButton.addActionListener(new ActionListener() { // rename branch 버튼 클릭 시
                 @Override
@@ -1681,7 +1687,15 @@ public class FileManager {
             deleteBranchButton.addActionListener(new ActionListener() { // delete branch 버튼 클릭 시
                 @Override
                 public void actionPerformed(ActionEvent e) {
-                    // deleteGitBranch();
+                    int selectedRow = table.getSelectedRow(); // 선택된 행의 인덱스
+                    int selectedColumn = table.getSelectedColumn(); // 선택된 열의 인덱스
+                    if (selectedRow == -1 || selectedColumn ==-1){
+                        showErrorMessage("선택한 브랜치가 없습니다. 브랜치를 선택하고 다시 시도해주세요", "Branch not selected error");
+                        return;
+                    }
+                    String selectedBranch = table.getValueAt(selectedRow, selectedColumn).toString(); // 선택된 셀의 값
+                    deleteGitBranch(selectedBranch);
+
                 }
             });
 
@@ -1699,13 +1713,7 @@ public class FileManager {
                 }
             });
 
-            // branch 목록 table 생성
-            JTable table = new JTable(rowData, columnNames);
-            table.setEnabled(true); // 객체 독립적으로 선택 가능
-            JScrollPane scrollPane = new JScrollPane(table);
-            scrollPane.setPreferredSize(new Dimension(400, 200));
-
-            // 둘을 결합하는 panel 생성
+            //브렌치 목록과 버튼을 결합하는 panel 생성
             JPanel panel = new JPanel(new BorderLayout());
             panel.add(scrollPane, BorderLayout.CENTER);
             panel.add(buttonPanel, BorderLayout.SOUTH);
@@ -1735,6 +1743,41 @@ public class FileManager {
         return false;
     }
 
+    /**
+     * git branch 삭제 로직
+     */
+    private void deleteGitBranch(String branchName){
+        try{
+            FileRepositoryBuilder builder = new FileRepositoryBuilder();
+            File gitDir = builder.findGitDir(currentFile).getGitDir(); // .git 폴더 찾기
+            Repository repository = builder.setGitDir(gitDir).readEnvironment().findGitDir().build(); // Repository 객체 생성
+            Ref head = repository.findRef("HEAD");
+            String headBranch = repository.getBranch();
+            if (headBranch.equals(branchName)){
+                showErrorMessage("현재 Head 브랜치는 삭제할 수 없습니다.","CurrentHead chosen error");
+                return;
+            }
+
+            String[] gitDeleteCommand = {"git", "branch", "-D", branchName};
+            ProcessBuilder processBuilder = new ProcessBuilder(gitDeleteCommand);
+            processBuilder.directory(currentFile.getParentFile());
+
+            Process process = processBuilder.start();
+
+            int delStatus = process.waitFor(); // git branch -D 명령어 정상 실행 여부 판단
+            if (delStatus == 0) { // git branch -D 명령어가 정상적으로 실행될 경우
+                JOptionPane.showMessageDialog(gui, "성공적으로 branch를 삭제했습니다.");
+                System.out.println("branch Deleted");
+            } else { //git branch -D 명령어가 정상적으로 실행되지 않았을 경우
+                showErrorMessage("branch 삭제 중 오류가 발생했습니다.", "git branch delete error");
+            }
+
+
+        }
+        catch(IOException | NullPointerException | InterruptedException e){
+            e.printStackTrace();
+        }
+    }
 
     private void gitCommitLogGraph() {
         try {
