@@ -523,7 +523,7 @@ public class FileManager {
             gitCloneFile.setMnemonic('C');
             gitCloneFile.addActionListener(new ActionListener() {
                 public void actionPerformed(ActionEvent ae) {
-                    // gitCloneFile();
+                    gitCloneFile();
                 }
             });
             toolBar.add(gitCloneFile);
@@ -1884,6 +1884,78 @@ public class FileManager {
         }
         return created;
     }
+    private void gitCloneFile(){
+
+        if (currentFile == null || isFileSelectedInList) {//1.디렉토리를 선택하지 않았을 경우, 별도행위없이 함수종료
+            showErrorMessage("좌측에서 디렉토리를 선택해주세요.", "Select Directory");
+            return;
+        }
+
+        JFrame cloneFrame = new JFrame();cloneFrame.setLayout(new BorderLayout());
+
+        JPanel publicPanel, privatePanel, buttonPanel, jpRadioButtons;
+        jpRadioButtons = new JPanel(); JRadioButton jbrPublic = new JRadioButton("public"), jbrPrivate = new JRadioButton("private");
+        jpRadioButtons.setLayout(new GridLayout(2, 1)); jpRadioButtons.setSize(30, 10);
+        ButtonGroup group = new ButtonGroup(); group.add(jbrPublic); group.add(jbrPrivate); jbrPublic.setSelected(true);
+        jpRadioButtons.add(jbrPublic); jpRadioButtons.add(jbrPrivate);
+
+        JLabel publicUrlLabel = new JLabel("Github Repo Address:");
+        JLabel privateUrlLabel = new JLabel("Github Repo Address");
+        JLabel idLabel = new JLabel("Id:");
+        JLabel tokenLabel = new JLabel("Access Token:");
+        JTextField publicUrlTextField = new JTextField(); publicUrlTextField.setSize(20, 300);
+        JTextField privateUrlTextField = new JTextField(); privateUrlTextField.setSize(20, 300);
+        JTextField idTextField = new JTextField(); idTextField.setSize(20, 300);
+        JTextField tokenTextField = new JTextField(); tokenTextField.setSize(20, 300);
+
+        publicPanel = new JPanel(); publicPanel.setLayout(new GridLayout(1, 2));
+        publicPanel.add(publicUrlLabel); publicPanel.add(publicUrlTextField);
+
+        privatePanel = new JPanel(); privatePanel.setLayout(new GridLayout(3, 2));
+        privatePanel.add(privateUrlLabel); privatePanel.add(privateUrlTextField);
+        privatePanel.add(idLabel); privatePanel.add(idTextField);
+        privatePanel.add(tokenLabel); privatePanel.add(tokenTextField);
+
+        JButton okButton = new JButton("Ok"), cancelButton = new JButton("Cancle");
+        buttonPanel = new JPanel(); buttonPanel.add(okButton); buttonPanel.add(cancelButton);
+
+        cloneFrame.add(publicPanel, BorderLayout.CENTER);
+        cloneFrame.add(jpRadioButtons, BorderLayout.WEST); cloneFrame.add(buttonPanel, BorderLayout.SOUTH);
+        cloneFrame.setVisible(true); cloneFrame.setSize(1000, 500);
+        cloneFrame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
+        cloneFrame.pack();
+        jbrPublic.addActionListener(new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                cloneFrame.remove(privatePanel);
+                cloneFrame.add(publicPanel, BorderLayout.CENTER);
+                cloneFrame.pack(); cloneFrame.repaint();
+            }
+        });
+        jbrPrivate.addActionListener(new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                cloneFrame.remove(publicPanel);
+                cloneFrame.add(privatePanel, BorderLayout.CENTER);
+                cloneFrame.pack(); cloneFrame.repaint();
+            }
+        });
+        okButton.addActionListener(new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+
+            }
+        });
+        cancelButton.addActionListener(new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                cloneFrame.dispose();
+            }
+        });
+
+    }
+    private void gitClonePublic(){}
+    private void gitClonePrivate(){}
 
     public static void main(String[] args) {
         SwingUtilities.invokeLater(new Runnable() {
