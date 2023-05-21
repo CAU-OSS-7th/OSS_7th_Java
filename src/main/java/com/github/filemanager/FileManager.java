@@ -43,11 +43,20 @@ import javax.swing.tree.*;
 
 import org.apache.commons.io.FileUtils;
 import org.eclipse.jgit.api.Git;
+import org.eclipse.jgit.api.LogCommand;
 import org.eclipse.jgit.api.Status;
 import org.eclipse.jgit.api.errors.GitAPIException;
+import org.eclipse.jgit.api.errors.NoHeadException;
+import org.eclipse.jgit.errors.IncorrectObjectTypeException;
+import org.eclipse.jgit.errors.MissingObjectException;
+import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.Ref;
 import org.eclipse.jgit.lib.Repository;
 import org.eclipse.jgit.lib.RepositoryBuilder;
+import org.eclipse.jgit.revplot.AbstractPlotRenderer;
+import org.eclipse.jgit.revwalk.RevCommit;
+import org.eclipse.jgit.revwalk.RevSort;
+import org.eclipse.jgit.revwalk.RevWalk;
 import org.eclipse.jgit.storage.file.FileRepositoryBuilder;
 
 /**
@@ -533,7 +542,7 @@ public class FileManager {
             gitCommitHistoryFile.setMnemonic('H');
             gitCommitHistoryFile.addActionListener(new ActionListener() {
                 public void actionPerformed(ActionEvent ae) {
-                    // gitCommitHistoryFile();
+                    gitCommitLogGraph();
                 }
             });
             toolBar.add(gitCommitHistoryFile);
@@ -1724,6 +1733,37 @@ public class FileManager {
             e.printStackTrace();
         }
         return false;
+    }
+
+
+    private void gitCommitLogGraph() {
+        try {
+            FileRepositoryBuilder builder = new FileRepositoryBuilder();
+            File gitDir = builder.findGitDir(currentFile).getGitDir(); // .git 폴더 찾기
+            Repository repository = builder.setGitDir(gitDir).readEnvironment().findGitDir().build(); // Repository 객체 생성
+            Git git = new Git(repository);
+
+            List<Ref> branches = git.branchList().call();
+
+            DefaultTableModel tableModel = new DefaultTableModel();
+            JTable logTable = new JTable(tableModel);
+
+            //임의 설정
+            logTable.addColumn(new TableColumn());
+
+            JScrollPane scrollPane = new JScrollPane(logTable);
+            scrollPane.setPreferredSize(new Dimension(700, 200));
+            JLabel logLabel = new JLabel("Commit log");
+
+            JPanel panel = new JPanel(new BorderLayout());
+            panel.add(logLabel, BorderLayout.NORTH);
+            panel.add(logTable, BorderLayout.SOUTH);
+
+            int optionPane = JOptionPane.showOptionDialog(gui, panel, "Git Commit", JOptionPane.OK_CANCEL_OPTION,JOptionPane.QUESTION_MESSAGE,null,null,JOptionPane.YES_OPTION);
+            repository.close();
+        } catch (IOException | GitAPIException e) {
+            e.printStackTrace();
+        }
     }
 
     private void showErrorMessage(String errorMessage, String errorTitle) {
