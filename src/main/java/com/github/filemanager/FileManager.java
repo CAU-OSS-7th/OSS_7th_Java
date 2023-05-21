@@ -532,7 +532,7 @@ public class FileManager {
             gitCloneFile.setMnemonic('C');
             gitCloneFile.addActionListener(new ActionListener() {
                 public void actionPerformed(ActionEvent ae) {
-                    // gitCloneFile();
+                    gitCloneFile();
                 }
             });
             toolBar.add(gitCloneFile);
@@ -1924,6 +1924,112 @@ public class FileManager {
         }
         return created;
     }
+    private void gitCloneFile(){
+        /*
+        1.git clone 버튼을 누르면 나오는 공통된 창을 만들기.
+        2.public, private Panel각기 만들어주고 공란 예외처리
+        3.ok 버튼이 눌렸을 때 public, private 중 선택된 기능함수 호출.
+
+        실행 전 파일 선택 예외처리 수정 필요해보임.
+        */
+
+        if (currentFile == null || !currentFile.isDirectory()) {//1.디렉토리를 선택하지 않았을 경우, 별도행위없이 함수종료
+            showErrorMessage("디렉토리를 선택해주세요.", "Select Directory");
+            return;
+        }
+        //clone 버튼 클릭시 띄울 프레임
+        JFrame cloneFrame = new JFrame("local directory: " + currentFile.getName());cloneFrame.setLayout(new BorderLayout());
+
+        //public과 private 중 어떤 유형의 레포를 clone할 지 선택하고 유형에 따른 입력값을 달리하기 위한 옵션구현.
+        JPanel publicPanel, privatePanel, buttonPanel, jpRadioButtons;
+        jpRadioButtons = new JPanel(); JRadioButton jbrPublic = new JRadioButton("public"), jbrPrivate = new JRadioButton("private");
+        jpRadioButtons.setLayout(new GridLayout(2, 1)); jpRadioButtons.setSize(30, 10);
+        ButtonGroup group = new ButtonGroup(); group.add(jbrPublic); group.add(jbrPrivate); jbrPublic.setSelected(true);
+        jpRadioButtons.add(jbrPublic); jpRadioButtons.add(jbrPrivate);
+
+        JLabel publicUrlLabel = new JLabel("Github Repo Address:");
+        JLabel privateUrlLabel = new JLabel("Github Repo Address");
+        JLabel idLabel = new JLabel("Id:");
+        JLabel tokenLabel = new JLabel("Access Token:");
+        JTextField publicUrlTextField = new JTextField(); publicUrlTextField.setSize(100, 10);
+        JTextField privateUrlTextField = new JTextField(); privateUrlTextField.setPreferredSize(new Dimension(100, 20));
+        JTextField idTextField = new JTextField(); idTextField.setPreferredSize(new Dimension(100, 20));
+        JTextField tokenTextField = new JTextField(); tokenTextField.setPreferredSize(new Dimension(100, 20));
+
+        //public repo를 clone하는 경우
+        publicPanel = new JPanel(); publicPanel.setLayout(new BorderLayout());
+        publicPanel.add(publicUrlLabel, BorderLayout.WEST); publicPanel.add(publicUrlTextField, BorderLayout.CENTER);
+
+        //private repo를 clone하는 경우
+        privatePanel = new JPanel(); privatePanel.setLayout(new BorderLayout());
+        JPanel labelPanel = new JPanel(); labelPanel.setLayout(new GridLayout(3, 1));
+        JPanel inputPanel = new JPanel(); inputPanel.setLayout(new GridLayout(3, 1));
+        labelPanel.add(privateUrlLabel); labelPanel.add(idLabel); labelPanel.add(tokenLabel);
+        inputPanel.add(privateUrlTextField); inputPanel.add(idTextField); inputPanel.add(tokenTextField);
+        privatePanel.add(labelPanel, BorderLayout.WEST); privatePanel.add(inputPanel, BorderLayout.CENTER);
+
+        JButton okButton = new JButton("Ok"), cancelButton = new JButton("Cancle");
+        buttonPanel = new JPanel(); buttonPanel.add(okButton); buttonPanel.add(cancelButton);
+
+        cloneFrame.add(publicPanel, BorderLayout.CENTER);
+        cloneFrame.add(jpRadioButtons, BorderLayout.WEST); cloneFrame.add(buttonPanel, BorderLayout.SOUTH);
+        cloneFrame.setVisible(true); cloneFrame.setLocationRelativeTo(null); cloneFrame.setPreferredSize(new Dimension(500, 120));
+        cloneFrame.pack();
+        jbrPublic.addActionListener(new ActionListener() {//public 입력창으로 변환.
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                cloneFrame.remove(privatePanel);
+                cloneFrame.add(publicPanel, BorderLayout.CENTER);
+                cloneFrame.pack(); cloneFrame.repaint();
+            }
+        });
+        jbrPrivate.addActionListener(new ActionListener() {//private 입력창으로 변환.
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                cloneFrame.remove(publicPanel);
+                cloneFrame.add(privatePanel, BorderLayout.CENTER);
+                cloneFrame.pack(); cloneFrame.repaint();
+            }
+        });
+        okButton.addActionListener(new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                if(jbrPublic.isSelected()){
+                    if(publicUrlTextField.getText().isEmpty()){
+                        showErrorMessage("Github Repository Address를 입력해주세요.", "Empty URL");
+                        return;
+                    }
+                    gitClonePublic();
+                }
+                else if(jbrPrivate.isSelected()){
+                    if(privateUrlTextField.getText().isEmpty()){
+                        showErrorMessage("Github Repository Address를 입력해주세요.", "Empty URL");
+                        return;
+                    }
+                    else if(idTextField.getText().isEmpty()){
+                        showErrorMessage("id를 입력해주세요.", "Empty ID");
+                        return;
+                    }
+                    else if(tokenTextField.getText().isEmpty()){
+                        showErrorMessage("Access Token을 입력해주세요.", "Empty Access Token");
+                        return;
+                    }
+
+                    gitClonePrivate();
+                }
+                cloneFrame.dispose();
+            }
+        });
+        cancelButton.addActionListener(new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                cloneFrame.dispose();
+            }
+        });
+
+    }
+    private void gitClonePublic(){}
+    private void gitClonePrivate(){}
 
     public static void main(String[] args) {
         SwingUtilities.invokeLater(new Runnable() {
