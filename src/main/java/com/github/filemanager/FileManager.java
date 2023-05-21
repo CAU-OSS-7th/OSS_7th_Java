@@ -1687,14 +1687,17 @@ public class FileManager {
             deleteBranchButton.addActionListener(new ActionListener() { // delete branch 버튼 클릭 시
                 @Override
                 public void actionPerformed(ActionEvent e) {
+                    //선택한 branch 이름을 받는 과정
                     int selectedRow = table.getSelectedRow(); // 선택된 행의 인덱스
                     int selectedColumn = table.getSelectedColumn(); // 선택된 열의 인덱스
+
+                    // 선택된 branch가 없는 경우 예외처리
                     if (selectedRow == -1 || selectedColumn ==-1){
                         showErrorMessage("선택한 브랜치가 없습니다. 브랜치를 선택하고 다시 시도해주세요", "Branch not selected error");
                         return;
                     }
-                    String selectedBranch = table.getValueAt(selectedRow, selectedColumn).toString(); // 선택된 셀의 값
-                    deleteGitBranch(selectedBranch);
+                    String selectedBranch = table.getValueAt(selectedRow, 0).toString(); // 선택된 셀의 branch 이름 , 어느곳을 선택해도 branch name 반환
+                    deleteGitBranch(selectedBranch); // delete 로직수행
 
                 }
             });
@@ -1753,6 +1756,7 @@ public class FileManager {
             Repository repository = builder.setGitDir(gitDir).readEnvironment().findGitDir().build(); // Repository 객체 생성
             Ref head = repository.findRef("HEAD");
             String headBranch = repository.getBranch();
+            // 현재 head 의 branch 는 삭제할 수 없음
             if (headBranch.equals(branchName)){
                 showErrorMessage("현재 Head 브랜치는 삭제할 수 없습니다.","CurrentHead chosen error");
                 return;
@@ -1760,7 +1764,11 @@ public class FileManager {
 
             String[] gitDeleteCommand = {"git", "branch", "-D", branchName};
             ProcessBuilder processBuilder = new ProcessBuilder(gitDeleteCommand);
-            processBuilder.directory(currentFile.getParentFile());
+            if(currentFile.isDirectory()){ // 현재 디렉토리 -> 바로 실행
+                processBuilder.directory(currentFile);
+            } else { // 현재 파일 -> 파일의 부모 디렉토리 기준으로 실행
+                processBuilder.directory(currentFile.getParentFile());
+            }
 
             Process process = processBuilder.start();
 
