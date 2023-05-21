@@ -1943,7 +1943,30 @@ public class FileManager {
         okButton.addActionListener(new ActionListener() {
             @Override
             public void actionPerformed(ActionEvent e) {
+                if(jbrPublic.isSelected()){
+                    if(publicUrlTextField.getText().isEmpty()){
+                        showErrorMessage("Github Repository Address를 입력해주세요.", "Empty URL");
+                        return;
+                    }
+                    gitClonePublic();
+                }
+                else if(jbrPrivate.isSelected()){
+                    if(privateUrlTextField.getText().isEmpty()){
+                        showErrorMessage("Github Repository Address를 입력해주세요.", "Empty URL");
+                        return;
+                    }
+                    else if(idTextField.getText().isEmpty()){
+                        showErrorMessage("id를 입력해주세요.", "Empty ID");
+                        return;
+                    }
+                    else if(tokenTextField.getText().isEmpty()){
+                        showErrorMessage("Access Token을 입력해주세요.", "Empty Access Token");
+                        return;
+                    }
 
+                    gitClonePrivate();
+                }
+                cloneFrame.dispose();
             }
         });
         cancelButton.addActionListener(new ActionListener() {
