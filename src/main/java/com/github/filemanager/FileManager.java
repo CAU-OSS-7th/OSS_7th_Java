@@ -1804,28 +1804,30 @@ public class FileManager {
             Repository repository = builder.setGitDir(gitDir).readEnvironment().findGitDir().build(); // Repository 객체 생성
             Git git = new Git(repository);
 
-            Ref currentBranch = repository.exactRef(repository.getFullBranch());
-            String currentBranchName = currentBranch.getName();
+            Ref currentBranch = repository.exactRef(repository.getFullBranch()); //현재 브랜치의 정보 불러오기
+            String currentBranchName = currentBranch.getName(); //현재 브랜치의 이름 불러오기 (refs/ ...)
 
-            Iterable<RevCommit> commits = git.log().add(repository.resolve(currentBranchName)).call();
+            Iterable<RevCommit> commits = git.log().add(repository.resolve(currentBranchName)).call(); //현재 브랜치를 기준으로
+            //커밋 오브젝트 불러오기
 
             DefaultTableModel tableModel = new DefaultTableModel();
             tableModel.addColumn("Commit ID");
             tableModel.addColumn("Commit Message");
 
-            for (RevCommit commit : commits) {
+            for (RevCommit commit : commits) { //각 커밋 오브젝트들을 불러와 테이블에 표시
                 String commitId = commit.getId().getName();
                 String commitMessage = commit.getShortMessage();
                 Object[] rowData = {commitId, commitMessage};
                 tableModel.addRow(rowData);
             }
 
-            JTable logTable = new JTable(tableModel);
+            JTable logTable = new JTable(tableModel); //커밋 오브젝트를 표기하는 테이블
             JScrollPane scrollPane = new JScrollPane(logTable);
 
             scrollPane.setPreferredSize(new Dimension(700, 200));
             JLabel logLabel = new JLabel("Commit log");
 
+            //밑에 커밋 오브젝트들의 정보를 표시하기 위한 별도의 패널
             JLabel commitIdLabel = new JLabel();
             JLabel authorLabel = new JLabel();
             JLabel dateLabel = new JLabel();
@@ -1836,14 +1838,14 @@ public class FileManager {
                 @Override
                 public void valueChanged(ListSelectionEvent e) {
                     if (!e.getValueIsAdjusting()) {
-                        int selectedRow = logTable.getSelectedRow();
+                        int selectedRow = logTable.getSelectedRow(); //현재 선택한 테이블의 행 가져오기
                         if (selectedRow != -1) {
-                            String commitId = (String) logTable.getValueAt(selectedRow, 0);
+                            String commitId = (String) logTable.getValueAt(selectedRow, 0); //테이블의 커밋 오브젝트 ID를 기준으로 커밋의 정보 불러오기
                             try{
-                                RevCommit commit = git.getRepository().parseCommit(repository.resolve(commitId));
-                                String author = commit.getAuthorIdent().getName();
-                                String date = commit.getAuthorIdent().getWhen().toString();
-                                String message = commit.getFullMessage();
+                                RevCommit commit = git.getRepository().parseCommit(repository.resolve(commitId)); //커밋 오브젝트 ID를 통해 특정 커밋 오브젝트 정보 불러오기
+                                String author = commit.getAuthorIdent().getName(); //작성자
+                                String date = commit.getAuthorIdent().getWhen().toString(); //커밋 날짜
+                                String message = commit.getFullMessage(); //커밋 메시지
 
                                 // 커밋 정보를 표시하는 JLabel 업데이트
                                 commitIdLabel.setText(commitId);
@@ -1859,17 +1861,17 @@ public class FileManager {
                 }
             });
 
-            JPanel commitMainInfo = new JPanel(new BorderLayout(4, 2));
+            JPanel commitMainInfo = new JPanel(new BorderLayout(4, 2)); //커밋 정보 패널
             commitMainInfo.setBorder(new EmptyBorder(0, 6, 0, 6));
 
-            JPanel commitLabel = new JPanel(new GridLayout(0, 1, 2, 2));
+            JPanel commitLabel = new JPanel(new GridLayout(0, 1, 2, 2)); //왼쪽의 커밋 정보 분류 레이블
             commitLabel.setForeground(Color.gray);
             commitMainInfo.add(commitLabel, BorderLayout.WEST);
 
-            JPanel commitDetail = new JPanel(new GridLayout(0, 1, 2, 2));
+            JPanel commitDetail = new JPanel(new GridLayout(0, 1, 2, 2)); //오른쪽의 커밋 디테일 레이블
             commitMainInfo.add(commitDetail, BorderLayout.CENTER);
 
-            commitLabel.add(new JLabel("Commit ID : ", JLabel.TRAILING));
+            commitLabel.add(new JLabel("Commit ID : ", JLabel.TRAILING)); //레이블 텍스트를 오른쪽으로 정렬
             commitDetail.add(commitIdLabel);
             commitLabel.add(new JLabel("Author : ", JLabel.TRAILING));
             commitDetail.add(authorLabel);
@@ -1880,7 +1882,7 @@ public class FileManager {
 
 
 
-            JPanel panel = new JPanel(new BorderLayout());
+            JPanel panel = new JPanel(new BorderLayout()); //패널 구성
             panel.add(logLabel, BorderLayout.NORTH);
             panel.add(scrollPane, BorderLayout.CENTER);
             panel.add(commitMainInfo, BorderLayout.SOUTH);
