@@ -1642,7 +1642,8 @@ public class FileManager {
             showErrorMessage("이 디렉토리는 git repository가 아닙니다.", "Not Git Repository");
             return;
         }
-
+        JFrame bmFrame = new JFrame("Git Branch manager");
+        bmFrame.setLayout(new BorderLayout());
         try {
             FileRepositoryBuilder builder = new FileRepositoryBuilder();
             File gitDir = builder.findGitDir(currentFile).getGitDir(); // .git 폴더 찾기
@@ -1675,7 +1676,12 @@ public class FileManager {
             JTable table = new JTable(rowData, columnNames);
             table.setEnabled(true); // 객체 독립적으로 선택 가능
             JScrollPane scrollPane = new JScrollPane(table);
-            scrollPane.setPreferredSize(new Dimension(400, 200));
+            scrollPane.setPreferredSize(new Dimension(1600, 1600));
+
+            //브렌치 목록과 버튼을 결합하는 panel 생성
+            JPanel panel = new JPanel(new BorderLayout());
+            panel.add(scrollPane, BorderLayout.CENTER);
+            panel.add(buttonPanel, BorderLayout.SOUTH);
 
             // 버튼 동작 구현
             renameBranchButton.addActionListener(new ActionListener() { // rename branch 버튼 클릭 시
@@ -1695,11 +1701,12 @@ public class FileManager {
                     // 선택된 branch가 없는 경우 예외처리
                     if (selectedRow == -1 || selectedColumn ==-1){
                         showErrorMessage("선택한 브랜치가 없습니다. 브랜치를 선택하고 다시 시도해주세요", "Branch not selected error");
+                        bmFrame.dispose();
                         return;
                     }
                     String selectedBranch = table.getValueAt(selectedRow, 0).toString(); // 선택된 셀의 branch 이름 , 어느곳을 선택해도 branch name 반환
                     deleteGitBranch(selectedBranch); // delete 로직수행
-
+                    bmFrame.dispose();
                 }
             });
 
@@ -1717,13 +1724,10 @@ public class FileManager {
                 }
             });
 
-            //브렌치 목록과 버튼을 결합하는 panel 생성
-            JPanel panel = new JPanel(new BorderLayout());
-            panel.add(scrollPane, BorderLayout.CENTER);
-            panel.add(buttonPanel, BorderLayout.SOUTH);
-
             // branchmanager 화면에 출력
-            JOptionPane.showMessageDialog(gui, panel, "branch manager", JOptionPane.INFORMATION_MESSAGE);
+            bmFrame.add(panel);
+            bmFrame.setVisible(true); bmFrame.setLocationRelativeTo(null); bmFrame.setPreferredSize(new Dimension(450, 450));
+            bmFrame.pack();
         } catch (IOException | GitAPIException e) {
             e.printStackTrace();
         }
@@ -1780,7 +1784,6 @@ public class FileManager {
             } else { //git branch -D 명령어가 정상적으로 실행되지 않았을 경우
                 showErrorMessage("branch 삭제 중 오류가 발생했습니다.", "git branch delete error");
             }
-
 
         }
         catch(IOException | NullPointerException | InterruptedException e){
