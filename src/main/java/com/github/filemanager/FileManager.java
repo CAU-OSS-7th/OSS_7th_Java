@@ -55,6 +55,7 @@ import org.eclipse.jgit.lib.Repository;
 import org.eclipse.jgit.lib.RepositoryBuilder;
 import org.eclipse.jgit.revplot.AbstractPlotRenderer;
 import org.eclipse.jgit.revwalk.RevCommit;
+import org.eclipse.jgit.revwalk.RevObject;
 import org.eclipse.jgit.revwalk.RevSort;
 import org.eclipse.jgit.revwalk.RevWalk;
 import org.eclipse.jgit.storage.file.FileRepositoryBuilder;
@@ -1788,27 +1789,101 @@ public class FileManager {
     }
 
     private void gitCommitLogGraph() {
+        if (currentFile == null) { // 파일 선택되지 않았을 때 에러
+            showErrorMessage("No location selected for new file.", "Select Location");
+            return;
+        }
+
+        if(!((isFileSelectedInList && isFileInGitRepository()) || (!isFileSelectedInList && isTreeInGitRepository()))) { // git repository가 아닌 경우 에러
+            showErrorMessage("이 디렉토리는 git repository가 아닙니다.", "Not Git Repository");
+            return;
+        }
         try {
             FileRepositoryBuilder builder = new FileRepositoryBuilder();
             File gitDir = builder.findGitDir(currentFile).getGitDir(); // .git 폴더 찾기
             Repository repository = builder.setGitDir(gitDir).readEnvironment().findGitDir().build(); // Repository 객체 생성
             Git git = new Git(repository);
 
-            List<Ref> branches = git.branchList().call();
+            Ref currentBranch = repository.exactRef(repository.getFullBranch());
+            String currentBranchName = currentBranch.getName();
+
+            Iterable<RevCommit> commits = git.log().add(repository.resolve(currentBranchName)).call();
 
             DefaultTableModel tableModel = new DefaultTableModel();
+            tableModel.addColumn("Commit ID");
+            tableModel.addColumn("Commit Message");
+
+            for (RevCommit commit : commits) {
+                String commitId = commit.getId().getName();
+                String commitMessage = commit.getShortMessage();
+                Object[] rowData = {commitId, commitMessage};
+                tableModel.addRow(rowData);
+            }
+
             JTable logTable = new JTable(tableModel);
-
-            //임의 설정
-            logTable.addColumn(new TableColumn());
-
             JScrollPane scrollPane = new JScrollPane(logTable);
+
             scrollPane.setPreferredSize(new Dimension(700, 200));
             JLabel logLabel = new JLabel("Commit log");
 
+            JLabel commitIdLabel = new JLabel();
+            JLabel authorLabel = new JLabel();
+            JLabel dateLabel = new JLabel();
+            JLabel messageLabel = new JLabel();
+
+            // 테이블 행 선택 이벤트 리스너
+            logTable.getSelectionModel().addListSelectionListener(new ListSelectionListener() {
+                @Override
+                public void valueChanged(ListSelectionEvent e) {
+                    if (!e.getValueIsAdjusting()) {
+                        int selectedRow = logTable.getSelectedRow();
+                        if (selectedRow != -1) {
+                            String commitId = (String) logTable.getValueAt(selectedRow, 0);
+                            try{
+                                RevCommit commit = git.getRepository().parseCommit(repository.resolve(commitId));
+                                String author = commit.getAuthorIdent().getName();
+                                String date = commit.getAuthorIdent().getWhen().toString();
+                                String message = commit.getFullMessage();
+
+                                // 커밋 정보를 표시하는 JLabel 업데이트
+                                commitIdLabel.setText(commitId);
+                                authorLabel.setText(author);
+                                dateLabel.setText(date);
+                                messageLabel.setText(message);
+                            }catch (IOException e1){
+                                e1.printStackTrace();
+                            }
+
+                        }
+                    }
+                }
+            });
+
+            JPanel commitMainInfo = new JPanel(new BorderLayout(4, 2));
+            commitMainInfo.setBorder(new EmptyBorder(0, 6, 0, 6));
+
+            JPanel commitLabel = new JPanel(new GridLayout(0, 1, 2, 2));
+            commitLabel.setForeground(Color.gray);
+            commitMainInfo.add(commitLabel, BorderLayout.WEST);
+
+            JPanel commitDetail = new JPanel(new GridLayout(0, 1, 2, 2));
+            commitMainInfo.add(commitDetail, BorderLayout.CENTER);
+
+            commitLabel.add(new JLabel("Commit ID : ", JLabel.TRAILING));
+            commitDetail.add(commitIdLabel);
+            commitLabel.add(new JLabel("Author : ", JLabel.TRAILING));
+            commitDetail.add(authorLabel);
+            commitLabel.add(new JLabel("Date : ", JLabel.TRAILING));
+            commitDetail.add(dateLabel);
+            commitLabel.add(new JLabel("Message : ", JLabel.TRAILING));
+            commitDetail.add(messageLabel);
+
+
+
             JPanel panel = new JPanel(new BorderLayout());
             panel.add(logLabel, BorderLayout.NORTH);
-            panel.add(logTable, BorderLayout.SOUTH);
+            panel.add(scrollPane, BorderLayout.CENTER);
+            panel.add(commitMainInfo, BorderLayout.SOUTH);
 
             int optionPane = JOptionPane.showOptionDialog(gui, panel, "Git Commit", JOptionPane.OK_CANCEL_OPTION,JOptionPane.QUESTION_MESSAGE,null,null,JOptionPane.YES_OPTION);
             repository.close();
