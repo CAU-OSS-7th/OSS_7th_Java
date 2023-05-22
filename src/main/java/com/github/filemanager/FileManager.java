@@ -1083,7 +1083,7 @@ public class FileManager {
     --> 2.git repo안의 파일인지 확인 (o)
     --> 3.새 파일명을 입력받는 팝업창 생성 (o)
     --> 4.확인버튼 누르면 비어있는지 확인, 기존 파일들과 이름 비교 (o)
-    --> 5.해당사항 없으면 새 파일명으로 변경(git rm file_from file_new 명령어 실행). (o)
+    --> 5.해당사항 없으면 새 파일명으로 변경(git mv file_from file_new 명령어 실행). (o)
     --> 6.결과에 따른 반환값에 따른 팝업창 생성 (o)
     */
         JFrame mvFrame;
@@ -2060,13 +2060,17 @@ public class FileManager {
 
         실행 전 파일 선택 예외처리 수정 필요해보임.
         */
-
         if (currentFile == null || !currentFile.isDirectory()) {//1.디렉토리를 선택하지 않았을 경우, 별도행위없이 함수종료
             showErrorMessage("디렉토리를 선택해주세요.", "Select Directory");
             return;
         }
+        else if(((isFileSelectedInList && isFileInGitRepository()) || has_gitFile()) || (!isFileSelectedInList && isTreeInGitRepository())){
+            showErrorMessage("Git Repository가 아닌 디렉토리를 선택해주세요.", "Select Directory(Not git repository)");
+            return;
+        }//
+
         //clone 버튼 클릭시 띄울 프레임
-        JFrame cloneFrame = new JFrame("local directory: " + currentFile.getName());cloneFrame.setLayout(new BorderLayout());
+        JFrame cloneFrame = new JFrame("git clone(local directory: " + currentFile.getName() + ")");cloneFrame.setLayout(new BorderLayout());
 
         //public과 private 중 어떤 유형의 레포를 clone할 지 선택하고 유형에 따른 입력값을 달리하기 위한 옵션구현.
         JPanel publicPanel, privatePanel, buttonPanel, jpRadioButtons;
@@ -2096,7 +2100,7 @@ public class FileManager {
         inputPanel.add(privateUrlTextField); inputPanel.add(idTextField); inputPanel.add(tokenTextField);
         privatePanel.add(labelPanel, BorderLayout.WEST); privatePanel.add(inputPanel, BorderLayout.CENTER);
 
-        JButton okButton = new JButton("Ok"), cancelButton = new JButton("Cancle");
+        JButton okButton = new JButton("Ok"), cancelButton = new JButton("Cancel");
         buttonPanel = new JPanel(); buttonPanel.add(okButton); buttonPanel.add(cancelButton);
 
         cloneFrame.add(publicPanel, BorderLayout.CENTER);
@@ -2127,7 +2131,7 @@ public class FileManager {
                         showErrorMessage("Github Repository Address를 입력해주세요.", "Empty URL");
                         return;
                     }
-                    gitClonePublic();
+                    gitClonePublic(publicUrlTextField.getText());
                 }
                 else if(jbrPrivate.isSelected()){
                     if(privateUrlTextField.getText().isEmpty()){
@@ -2156,8 +2160,54 @@ public class FileManager {
         });
 
     }
-    private void gitClonePublic(){}
+    private void gitClonePublic(String RepositoryURL){
+        try{
+            int result = JOptionPane.showConfirmDialog(gui, "Public Repository를 Clone하시겠습니까?", "git clone public", JOptionPane.ERROR_MESSAGE);
+
+            if (result == JOptionPane.OK_OPTION) { // "예" 클릭 시 git clone 명령어 실행
+                String[] gitCloneCommand = {"git", "clone", RepositoryURL};
+                ProcessBuilder processBuilder = new ProcessBuilder(gitCloneCommand);
+                processBuilder.directory(currentFile);
+                Process process = processBuilder.start();
+                int cloneStatus = process.waitFor(); //git clone 명령어 정상 실행 여부
+
+                if (cloneStatus == 0) { // git clone 명령어가 정상적으로 실행되어 status가 0일 경우
+                    JOptionPane.showMessageDialog(gui, "성공적으로 Repository를 clone 했습니다.");
+                    System.out.println("Cloned");
+                    TreePath parentPath = findTreePath(currentFile.getParentFile());
+                    DefaultMutableTreeNode parentNode = (DefaultMutableTreeNode) parentPath.getLastPathComponent();
+                    showChildren(parentNode);
+                } else { //git clone 명령어가 정상적으로 실행되지 않았을 경우
+                    showErrorMessage("파일을 Clone하는 과정에서 오류가 발생했습니다.", "git clone error");
+                }
+            }
+            gui.repaint();
+        } catch (InterruptedException | IOException e){
+            e.printStackTrace();
+        }
+    }
     private void gitClonePrivate(){}
+
+    private boolean has_gitFile(){//현재 디렉토리에 .git파일이 있는지 검사하는 함수
+        String[] gitCheckCommand = {"git", "status"}; //Git status 명령어를 통해 간접적으로 .git 폴더 유무 확인
+        ProcessBuilder processBuilder = new ProcessBuilder(gitCheckCommand);
+        processBuilder.directory(currentFile); //선택한 파일의 경로 반환
+        Process process;
+        int gitStatus = -1;
+
+        try{
+            process = processBuilder.start(); //git status 명령어를 선택한 파일의 경로에서 실행하여 git이 있는지 확인
+            gitStatus = process.waitFor(); //만일 git status가 잘 실행됐다면 git repository에 있다는 것이고, 아니라면 에러코드를 반환
+            if (gitStatus == 0){
+                return true;
+            }else{
+                return false;
+            }
+        }catch (IOException | InterruptedException e){
+            e.printStackTrace();
+        }
+        return false;
+    }
 
     public static void main(String[] args) {
         SwingUtilities.invokeLater(new Runnable() {
