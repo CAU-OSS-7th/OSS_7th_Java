@@ -1083,7 +1083,7 @@ public class FileManager {
     --> 2.git repo안의 파일인지 확인 (o)
     --> 3.새 파일명을 입력받는 팝업창 생성 (o)
     --> 4.확인버튼 누르면 비어있는지 확인, 기존 파일들과 이름 비교 (o)
-    --> 5.해당사항 없으면 새 파일명으로 변경(git rm file_from file_new 명령어 실행). (o)
+    --> 5.해당사항 없으면 새 파일명으로 변경(git mv file_from file_new 명령어 실행). (o)
     --> 6.결과에 따른 반환값에 따른 팝업창 생성 (o)
     */
         JFrame mvFrame;
@@ -1229,7 +1229,6 @@ public class FileManager {
         }
 
         if(isFileInGitRepository()) {//2.git repo안에 있는 경우에만 실행.
-        }else{ //2. .git이 존재하지 않는 경우 (git status 명령어가 실패했을 경우)
             try{
                 if(isCommittedOrUnmodifiedFile(currentFile)) {//파일이 Committed, Unmodified 상태인 경우에만 실행
                     int result = JOptionPane.showConfirmDialog(gui, "해당 파일을 삭제하고 이 변화를 staged하시겠습니까?", "git rm", JOptionPane.ERROR_MESSAGE);
@@ -1259,6 +1258,7 @@ public class FileManager {
             } catch (InterruptedException | IOException e){
                 e.printStackTrace();
             }
+        }else{ //2. .git이 존재하지 않는 경우 (git status 명령어가 실패했을 경우)
             showErrorMessage("(현재 폴더 또는 상위 폴더 중 일부가) 깃 저장소가 아닙니다.","git rm error");
         }
         //
@@ -2060,11 +2060,15 @@ public class FileManager {
 
         실행 전 파일 선택 예외처리 수정 필요해보임.
         */
-
         if (currentFile == null || !currentFile.isDirectory()) {//1.디렉토리를 선택하지 않았을 경우, 별도행위없이 함수종료
             showErrorMessage("디렉토리를 선택해주세요.", "Select Directory");
             return;
         }
+        else if(((isFileSelectedInList && isFileInGitRepository()) || has_gitFile()) || (!isFileSelectedInList && isTreeInGitRepository())){
+            showErrorMessage("Git Repository가 아닌 디렉토리를 선택해주세요.", "Select Directory(Not git repository)");
+            return;
+        }//
+
         //clone 버튼 클릭시 띄울 프레임
         JFrame cloneFrame = new JFrame("local directory: " + currentFile.getName());cloneFrame.setLayout(new BorderLayout());
 
@@ -2183,6 +2187,27 @@ public class FileManager {
         }
     }
     private void gitClonePrivate(){}
+
+    private boolean has_gitFile(){//현재 디렉토리에 .git파일이 있는지 검사하는 함수
+        String[] gitCheckCommand = {"git", "status"}; //Git status 명령어를 통해 간접적으로 .git 폴더 유무 확인
+        ProcessBuilder processBuilder = new ProcessBuilder(gitCheckCommand);
+        processBuilder.directory(currentFile); //선택한 파일의 경로 반환
+        Process process;
+        int gitStatus = -1;
+
+        try{
+            process = processBuilder.start(); //git status 명령어를 선택한 파일의 경로에서 실행하여 git이 있는지 확인
+            gitStatus = process.waitFor(); //만일 git status가 잘 실행됐다면 git repository에 있다는 것이고, 아니라면 에러코드를 반환
+            if (gitStatus == 0){
+                return true;
+            }else{
+                return false;
+            }
+        }catch (IOException | InterruptedException e){
+            e.printStackTrace();
+        }
+        return false;
+    }
 
     public static void main(String[] args) {
         SwingUtilities.invokeLater(new Runnable() {
