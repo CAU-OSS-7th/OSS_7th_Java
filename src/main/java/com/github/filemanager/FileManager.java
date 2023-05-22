@@ -2070,7 +2070,7 @@ public class FileManager {
         }//
 
         //clone 버튼 클릭시 띄울 프레임
-        JFrame cloneFrame = new JFrame("local directory: " + currentFile.getName());cloneFrame.setLayout(new BorderLayout());
+        JFrame cloneFrame = new JFrame("git clone(local directory: " + currentFile.getName() + ")");cloneFrame.setLayout(new BorderLayout());
 
         //public과 private 중 어떤 유형의 레포를 clone할 지 선택하고 유형에 따른 입력값을 달리하기 위한 옵션구현.
         JPanel publicPanel, privatePanel, buttonPanel, jpRadioButtons;
@@ -2100,7 +2100,7 @@ public class FileManager {
         inputPanel.add(privateUrlTextField); inputPanel.add(idTextField); inputPanel.add(tokenTextField);
         privatePanel.add(labelPanel, BorderLayout.WEST); privatePanel.add(inputPanel, BorderLayout.CENTER);
 
-        JButton okButton = new JButton("Ok"), cancelButton = new JButton("Cancle");
+        JButton okButton = new JButton("Ok"), cancelButton = new JButton("Cancel");
         buttonPanel = new JPanel(); buttonPanel.add(okButton); buttonPanel.add(cancelButton);
 
         cloneFrame.add(publicPanel, BorderLayout.CENTER);
