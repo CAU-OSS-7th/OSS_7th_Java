@@ -1229,6 +1229,7 @@ public class FileManager {
         }
 
         if(isFileInGitRepository()) {//2.git repo안에 있는 경우에만 실행.
+        }else{ //2. .git이 존재하지 않는 경우 (git status 명령어가 실패했을 경우)
             try{
                 if(isCommittedOrUnmodifiedFile(currentFile)) {//파일이 Committed, Unmodified 상태인 경우에만 실행
                     int result = JOptionPane.showConfirmDialog(gui, "해당 파일을 삭제하고 이 변화를 staged하시겠습니까?", "git rm", JOptionPane.ERROR_MESSAGE);
@@ -1258,7 +1259,6 @@ public class FileManager {
             } catch (InterruptedException | IOException e){
                 e.printStackTrace();
             }
-        }else{ //2. .git이 존재하지 않는 경우 (git status 명령어가 실패했을 경우)
             showErrorMessage("(현재 폴더 또는 상위 폴더 중 일부가) 깃 저장소가 아닙니다.","git rm error");
         }
         //
@@ -2127,7 +2127,7 @@ public class FileManager {
                         showErrorMessage("Github Repository Address를 입력해주세요.", "Empty URL");
                         return;
                     }
-                    gitClonePublic();
+                    gitClonePublic(publicUrlTextField.getText());
                 }
                 else if(jbrPrivate.isSelected()){
                     if(privateUrlTextField.getText().isEmpty()){
@@ -2156,7 +2156,32 @@ public class FileManager {
         });
 
     }
-    private void gitClonePublic(){}
+    private void gitClonePublic(String RepositoryURL){
+        try{
+            int result = JOptionPane.showConfirmDialog(gui, "Public Repository를 Clone하시겠습니까?", "git clone public", JOptionPane.ERROR_MESSAGE);
+
+            if (result == JOptionPane.OK_OPTION) { // "예" 클릭 시 git clone 명령어 실행
+                String[] gitCloneCommand = {"git", "clone", RepositoryURL};
+                ProcessBuilder processBuilder = new ProcessBuilder(gitCloneCommand);
+                processBuilder.directory(currentFile);
+                Process process = processBuilder.start();
+                int cloneStatus = process.waitFor(); //git clone 명령어 정상 실행 여부
+
+                if (cloneStatus == 0) { // git clone 명령어가 정상적으로 실행되어 status가 0일 경우
+                    JOptionPane.showMessageDialog(gui, "성공적으로 Repository를 clone 했습니다.");
+                    System.out.println("Cloned");
+                    TreePath parentPath = findTreePath(currentFile.getParentFile());
+                    DefaultMutableTreeNode parentNode = (DefaultMutableTreeNode) parentPath.getLastPathComponent();
+                    showChildren(parentNode);
+                } else { //git clone 명령어가 정상적으로 실행되지 않았을 경우
+                    showErrorMessage("파일을 Clone하는 과정에서 오류가 발생했습니다.", "git clone error");
+                }
+            }
+            gui.repaint();
+        } catch (InterruptedException | IOException e){
+            e.printStackTrace();
+        }
+    }
     private void gitClonePrivate(){}
 
     public static void main(String[] args) {
