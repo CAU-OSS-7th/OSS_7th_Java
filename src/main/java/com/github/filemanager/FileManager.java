@@ -111,7 +111,7 @@ public class FileManager {
      * Main GUI container
      */
     private JPanel gui;
-
+    private JFrame bmFrame;
     /**
      * File-system tree. Built Lazily
      */
@@ -1642,7 +1642,7 @@ public class FileManager {
             showErrorMessage("이 디렉토리는 git repository가 아닙니다.", "Not Git Repository");
             return;
         }
-        JFrame bmFrame = new JFrame("Git Branch manager");
+        bmFrame = new JFrame("Git Branch manager");
         bmFrame.setLayout(new BorderLayout());
         try {
             FileRepositoryBuilder builder = new FileRepositoryBuilder();
@@ -1675,6 +1675,7 @@ public class FileManager {
             // branch 목록 table 생성
             JTable table = new JTable(rowData, columnNames);
             table.setEnabled(true); // 객체 독립적으로 선택 가능
+            table.setSelectionMode(ListSelectionModel.SINGLE_SELECTION); // 다중선택을 막고 단일 선택만 할 수 있음
             JScrollPane scrollPane = new JScrollPane(table);
             scrollPane.setPreferredSize(new Dimension(1600, 1600));
 
@@ -1700,8 +1701,8 @@ public class FileManager {
 
                     // 선택된 branch가 없는 경우 예외처리
                     if (selectedRow == -1 || selectedColumn ==-1){
-                        showErrorMessage("선택한 브랜치가 없습니다. 브랜치를 선택하고 다시 시도해주세요", "Branch not selected error");
-                        bmFrame.dispose();
+                        JOptionPane.showMessageDialog(bmFrame, "선택한 브랜치가 없습니다. 브랜치를 선택하고 다시 시도해주세요", "Branch not selected error", JOptionPane.ERROR_MESSAGE);
+//                        showErrorMessage("선택한 브랜치가 없습니다. 브랜치를 선택하고 다시 시도해주세요", "Branch not selected error");
                         return;
                     }
                     String selectedBranch = table.getValueAt(selectedRow, 0).toString(); // 선택된 셀의 branch 이름 , 어느곳을 선택해도 branch name 반환
@@ -1726,7 +1727,7 @@ public class FileManager {
 
             // branchmanager 화면에 출력
             bmFrame.add(panel);
-            bmFrame.setVisible(true); bmFrame.setLocationRelativeTo(null); bmFrame.setPreferredSize(new Dimension(450, 450));
+            bmFrame.setVisible(true); bmFrame.setLocationRelativeTo(null); bmFrame.setPreferredSize(new Dimension(700, 450));
             bmFrame.pack();
         } catch (IOException | GitAPIException e) {
             e.printStackTrace();
@@ -1763,7 +1764,8 @@ public class FileManager {
             String headBranch = repository.getBranch();
             // 현재 head 의 branch 는 삭제할 수 없음
             if (headBranch.equals(branchName)){
-                showErrorMessage("현재 Head 브랜치는 삭제할 수 없습니다.","CurrentHead chosen error");
+//                showErrorMessage("현재 Head 브랜치는 삭제할 수 없습니다.","CurrentHead chosen error");
+                JOptionPane.showMessageDialog(bmFrame,  "현재 Head 브랜치는 삭제할 수 없습니다.", "CurrentHead chosen error",JOptionPane.ERROR_MESSAGE);
                 return;
             }
 
@@ -1782,7 +1784,8 @@ public class FileManager {
                 JOptionPane.showMessageDialog(gui, "성공적으로 branch를 삭제했습니다.");
                 System.out.println("branch Deleted");
             } else { //git branch -D 명령어가 정상적으로 실행되지 않았을 경우
-                showErrorMessage("branch 삭제 중 오류가 발생했습니다.", "git branch delete error");
+//                showErrorMessage("branch 삭제 중 오류가 발생했습니다.", "git branch delete error");
+                JOptionPane.showMessageDialog(bmFrame,  "branch 삭제 중 오류가 발생했습니다.", "git branch delete error",JOptionPane.ERROR_MESSAGE);
             }
 
         }
