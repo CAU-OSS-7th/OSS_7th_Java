@@ -2150,7 +2150,7 @@ public class FileManager {
                         return;
                     }
 
-                    gitClonePrivate();
+                    gitClonePrivate(privateUrlTextField.getText(), idTextField.getText(), tokenTextField.getText());
                 }
                 cloneFrame.dispose();
             }
@@ -2189,7 +2189,33 @@ public class FileManager {
             e.printStackTrace();
         }
     }
-    private void gitClonePrivate(){}
+    private void gitClonePrivate(String RepositoryURL, String id, String token){
+        try{
+            int result = JOptionPane.showConfirmDialog(gui, "Private Repository를 Clone하시겠습니까?", "git clone private", JOptionPane.ERROR_MESSAGE);
+
+            if (result == JOptionPane.OK_OPTION) { // "예" 클릭 시 git clone 명령어 실행
+                String[] gitCloneCommand = {"git", "clone", privateCloneCommandEdit(RepositoryURL, id, token)};
+                ProcessBuilder processBuilder = new ProcessBuilder(gitCloneCommand);
+                processBuilder.directory(currentFile);
+                Process process = processBuilder.start();
+                int cloneStatus = process.waitFor(); //git clone 명령어 정상 실행 여부
+
+                if (cloneStatus == 0) { // git clone 명령어가 정상적으로 실행되어 status가 0일 경우
+                    JOptionPane.showMessageDialog(gui, "성공적으로 Repository를 clone 했습니다.");
+                    System.out.println("Cloned");
+                    TreePath parentPath = findTreePath(currentFile.getParentFile());
+                    DefaultMutableTreeNode parentNode = (DefaultMutableTreeNode) parentPath.getLastPathComponent();
+                    showChildren(parentNode);
+                } else { //git clone 명령어가 정상적으로 실행되지 않았을 경우
+                    showErrorMessage("파일을 Clone하는 과정에서 오류가 발생했습니다.", "git clone error");
+                }
+            }
+
+            gui.repaint();
+        } catch (InterruptedException | IOException e){
+            e.printStackTrace();
+        }
+    }
 
     private boolean has_gitFile(){//현재 디렉토리에 .git파일이 있는지 검사하는 함수
         String[] gitCheckCommand = {"git", "status"}; //Git status 명령어를 통해 간접적으로 .git 폴더 유무 확인
@@ -2210,6 +2236,9 @@ public class FileManager {
             e.printStackTrace();
         }
         return false;
+    }
+    private String privateCloneCommandEdit(String url, String id, String token){
+        return ("https://" + id + ":" + token + ":" + "@" + url.substring(8));
     }
 
     public static void main(String[] args) {
