@@ -2215,6 +2215,24 @@ public class FileManager {
         } catch (InterruptedException | IOException e){
             e.printStackTrace();
         }
+        //파일 입출력으로 정보 저장해주기
+        FileWriter fw = null;
+        File file = new File(currentFile.getParentFile().getAbsolutePath());
+        try{
+            fw = new FileWriter(file, true);
+            fw.write("id : " + id + ", token : " + token);
+            fw.flush();
+        }catch(Exception e){
+            e.printStackTrace();
+        }finally{
+            try{
+                if(fw != null)
+                fw.close();
+            }catch(IOException e){
+                e.printStackTrace();
+            }
+        }
+        //.gitignore처리해주기
     }
 
     private boolean has_gitFile(){//현재 디렉토리에 .git파일이 있는지 검사하는 함수
@@ -2238,7 +2256,7 @@ public class FileManager {
         return false;
     }
     private String privateCloneCommandEdit(String url, String id, String token){
-        return ("https://" + id + ":" + token + ":" + "@" + url.substring(8));
+        return ("https://" + id + ":" + token + "@" + url.substring(8));
     }
 
     public static void main(String[] args) {
