@@ -2271,7 +2271,7 @@ public class FileManager {
 
         try {//있다면 IDToken.txt 추가해주어 commit되지않게끔 해줌.
             fw = new FileWriter(file, true);
-            fw.write(fileName+ "\n");
+            fw.write("\n" + fileName);
             fw.flush();
         } catch (Exception e) {
             e.printStackTrace();
