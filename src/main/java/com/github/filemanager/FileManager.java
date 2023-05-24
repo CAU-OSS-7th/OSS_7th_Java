@@ -2210,8 +2210,11 @@ public class FileManager {
                 if (cloneStatus == 0) { // git clone 명령어가 정상적으로 실행되어 status가 0일 경우
                     JOptionPane.showMessageDialog(gui, "성공적으로 Repository를 clone 했습니다.");
                     System.out.println("Cloned");
-                    TreePath parentPath = findTreePath(currentFile.getParentFile());
+
+                    TreePath parentPath = findTreePath(currentFile);
                     DefaultMutableTreeNode parentNode = (DefaultMutableTreeNode) parentPath.getLastPathComponent();
+                    DefaultMutableTreeNode newNode = new DefaultMutableTreeNode(findRenamedFile(currentFile, findFileNameFromURL(RepositoryURL)));
+                    treeModel.insertNodeInto(newNode, parentNode, parentNode.getChildCount());
                     showChildren(parentNode);
                 } else { //git clone 명령어가 정상적으로 실행되지 않았을 경우
                     showErrorMessage("파일을 Clone하는 과정에서 오류가 발생했습니다.", "git clone error");
