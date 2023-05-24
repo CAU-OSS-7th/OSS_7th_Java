@@ -2177,9 +2177,13 @@ public class FileManager {
                 if (cloneStatus == 0) { // git clone 명령어가 정상적으로 실행되어 status가 0일 경우
                     JOptionPane.showMessageDialog(gui, "성공적으로 Repository를 clone 했습니다.");
                     System.out.println("Cloned");
-                    TreePath parentPath = findTreePath(currentFile.getParentFile());
+
+                    TreePath parentPath = findTreePath(currentFile);
                     DefaultMutableTreeNode parentNode = (DefaultMutableTreeNode) parentPath.getLastPathComponent();
+                    DefaultMutableTreeNode newNode = new DefaultMutableTreeNode(findRenamedFile(currentFile, findFileNameFromURL(RepositoryURL)));
+                    treeModel.insertNodeInto(newNode, parentNode, parentNode.getChildCount());
                     showChildren(parentNode);
+
                 } else { //git clone 명령어가 정상적으로 실행되지 않았을 경우
                     showErrorMessage("파일을 Clone하는 과정에서 오류가 발생했습니다.", "git clone error");
                 }
@@ -2188,6 +2192,8 @@ public class FileManager {
         } catch (InterruptedException | IOException e){
             e.printStackTrace();
         }
+        DefaultMutableTreeNode newNode = new DefaultMutableTreeNode(findFileNameFromURL(RepositoryURL));
+
 
     }
     private void gitClonePrivate(String RepositoryURL, String id, String token){
@@ -2287,7 +2293,6 @@ public class FileManager {
     private String findFileNameFromURL(String Repositoryurl){//clone한 디렉토리 이름 parsing.
         String[] strArray = Repositoryurl.split("/");
         strArray[strArray.length-1] = strArray[strArray.length -1].substring(0, strArray[strArray.length-1].length() - 4);
-        System.out.println(strArray[strArray.length-1]);
         return strArray[strArray.length-1];
     }
     private boolean has_gitFile(){//현재 디렉토리에 .git파일이 있는지 검사하는 함수
