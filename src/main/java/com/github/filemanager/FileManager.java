@@ -2150,7 +2150,7 @@ public class FileManager {
                         return;
                     }
 
-                    gitClonePrivate();
+                    gitClonePrivate(privateUrlTextField.getText(), idTextField.getText(), tokenTextField.getText());
                 }
                 cloneFrame.dispose();
             }
@@ -2188,9 +2188,108 @@ public class FileManager {
         } catch (InterruptedException | IOException e){
             e.printStackTrace();
         }
-    }
-    private void gitClonePrivate(){}
 
+    }
+    private void gitClonePrivate(String RepositoryURL, String id, String token){
+        try{
+            int result = JOptionPane.showConfirmDialog(gui, "Private Repository를 Clone하시겠습니까?", "git clone private", JOptionPane.ERROR_MESSAGE);
+
+            if (result == JOptionPane.OK_OPTION) { // "예" 클릭 시 git clone 명령어 실행
+                String[] gitCloneCommand = {"git", "clone", "https://" + id + ":" + token + "@" + RepositoryURL.substring(8)};
+                ProcessBuilder processBuilder = new ProcessBuilder(gitCloneCommand);
+                processBuilder.directory(currentFile);
+                Process process = processBuilder.start();
+                int cloneStatus = process.waitFor(); //git clone 명령어 정상 실행 여부
+
+                if (cloneStatus == 0) { // git clone 명령어가 정상적으로 실행되어 status가 0일 경우
+                    JOptionPane.showMessageDialog(gui, "성공적으로 Repository를 clone 했습니다.");
+                    System.out.println("Cloned");
+                    TreePath parentPath = findTreePath(currentFile.getParentFile());
+                    DefaultMutableTreeNode parentNode = (DefaultMutableTreeNode) parentPath.getLastPathComponent();
+                    showChildren(parentNode);
+                } else { //git clone 명령어가 정상적으로 실행되지 않았을 경우
+                    showErrorMessage("파일을 Clone하는 과정에서 오류가 발생했습니다.", "git clone error");
+                }
+            }
+
+            gui.repaint();
+        } catch (InterruptedException | IOException e){
+            e.printStackTrace();
+        }
+        //파일 입출력으로 정보 저장해주기
+        boolean ifExist = false;
+        FileWriter fw = null;
+        BufferedReader br = null;
+        File file = new File("IDToken.txt");
+        if(!file.exists()){//해당 파일이 없다면.
+            try{
+                file.createNewFile();//생성
+
+                //.gitignore처리해주기
+                _gitignore(file.getName());
+            }catch(IOException e){e.printStackTrace();}
+        }
+        try{//id들을 parsing하여 입력된 Id가 이미 저장되어있는지 확인.
+            String line, tempId;
+            String[] parsed;
+            br = new BufferedReader(new FileReader(file));
+            while((line = br.readLine()) != null){
+                parsed = line.split(",");
+                tempId = parsed[0];
+                parsed = tempId.split(":");
+                tempId = parsed[1];
+                if(tempId.compareTo(id) == 0){ifExist = true; break;}
+            }
+        }catch(IOException e){e.printStackTrace();}
+
+        if(!ifExist) {//입력된 Id가 저장되어있지 않다면 txt파일에 추가해주기
+            try {
+                fw = new FileWriter(file, true);
+                fw.write("Id:" + id + ", Access Token:" + token + "\n");
+                fw.flush();
+            } catch (Exception e) {
+                e.printStackTrace();
+            } finally {
+                try {
+                    if (fw != null)
+                        fw.close();
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
+            }
+        }
+    }
+    private void _gitignore(String fileName){
+        FileWriter fw = null;
+        File file = new File(".gitignore");
+        if(!file.exists()){//.gitignore파일이 없다면
+            try{
+                file.createNewFile();//생성
+
+            }catch(IOException e){e.printStackTrace();}
+        }
+
+        try {//있다면 IDToken.txt 추가해주어 commit되지않게끔 해줌.
+            fw = new FileWriter(file, true);
+            fw.write("\n" + fileName);
+            fw.flush();
+        } catch (Exception e) {
+            e.printStackTrace();
+        } finally {
+            try {
+                if (fw != null)
+                    fw.close();
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+        }
+    }
+    private String findFileNameFromURL(String Repositoryurl){//clone한 디렉토리 이름 parsing.
+        String[] strArray = Repositoryurl.split("/");
+        strArray[strArray.length-1] = strArray[strArray.length -1].substring(0, strArray[strArray.length-1].length() - 4);
+        System.out.println(strArray[strArray.length-1]);
+        return strArray[strArray.length-1];
+    }
     private boolean has_gitFile(){//현재 디렉토리에 .git파일이 있는지 검사하는 함수
         String[] gitCheckCommand = {"git", "status"}; //Git status 명령어를 통해 간접적으로 .git 폴더 유무 확인
         ProcessBuilder processBuilder = new ProcessBuilder(gitCheckCommand);
