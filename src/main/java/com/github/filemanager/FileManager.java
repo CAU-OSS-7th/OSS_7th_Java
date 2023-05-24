@@ -2217,24 +2217,33 @@ public class FileManager {
         }
         //파일 입출력으로 정보 저장해주기
         FileWriter fw = null;
-        File file = new File(currentFile.getParentFile().getAbsolutePath());
+        File file = new File("IDToken.txt");
+        if(!file.exists()){
+            try{
+                file.createNewFile();
+
+                //.gitignore처리해주기
+                _gitignore(file.getName());
+            }catch(IOException e){e.printStackTrace();}
+        }
         try{
             fw = new FileWriter(file, true);
-            fw.write("id : " + id + ", token : " + token);
+            fw.write("url : " + RepositoryURL + "id : " + id + ", token : " + token + "\n");
             fw.flush();
         }catch(Exception e){
             e.printStackTrace();
         }finally{
             try{
                 if(fw != null)
-                fw.close();
+                    fw.close();
             }catch(IOException e){
                 e.printStackTrace();
             }
         }
-        //.gitignore처리해주기
     }
+    private void _gitignore(String fileName){
 
+    }
     private boolean has_gitFile(){//현재 디렉토리에 .git파일이 있는지 검사하는 함수
         String[] gitCheckCommand = {"git", "status"}; //Git status 명령어를 통해 간접적으로 .git 폴더 유무 확인
         ProcessBuilder processBuilder = new ProcessBuilder(gitCheckCommand);
