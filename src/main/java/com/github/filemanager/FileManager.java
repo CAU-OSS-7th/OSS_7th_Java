@@ -1702,10 +1702,27 @@ public class FileManager {
                     // 선택된 branch가 없는 경우 예외처리
                     if (selectedRow == -1 || selectedColumn ==-1){
                         JOptionPane.showMessageDialog(bmFrame, "선택한 브랜치가 없습니다. 브랜치를 선택하고 다시 시도해주세요", "Branch not selected error", JOptionPane.ERROR_MESSAGE);
-//                        showErrorMessage("선택한 브랜치가 없습니다. 브랜치를 선택하고 다시 시도해주세요", "Branch not selected error");
                         return;
                     }
                     String selectedBranch = table.getValueAt(selectedRow, 0).toString(); // 선택된 셀의 branch 이름 , 어느곳을 선택해도 branch name 반환
+
+                    //삭제를 하면 안되는 경우들에 대한 얘외처리
+                    FileRepositoryBuilder builder = new FileRepositoryBuilder();
+                    File gitDir = builder.findGitDir(currentFile).getGitDir(); // .git 폴더 찾기
+
+                    try {
+                        Repository repository = builder.setGitDir(gitDir).readEnvironment().findGitDir().build(); // Repository 객체 생성
+                        Ref head = repository.findRef("HEAD");
+                        String headBranch = repository.getBranch();
+                        // 현재 head 의 branch 는 삭제할 수 없음
+                        if (headBranch.equals(selectedBranch)){
+                            JOptionPane.showMessageDialog(bmFrame,  "현재 Head 브랜치는 삭제할 수 없습니다.", "Current Head chosen error",JOptionPane.ERROR_MESSAGE);
+                            return;
+                        }
+                    }catch (IOException err){
+                        err.printStackTrace();
+                    }
+
                     deleteGitBranch(selectedBranch); // delete 로직수행
                     bmFrame.dispose();
                 }
@@ -1757,19 +1774,8 @@ public class FileManager {
      */
     private void deleteGitBranch(String branchName){
         try{
-            FileRepositoryBuilder builder = new FileRepositoryBuilder();
-            File gitDir = builder.findGitDir(currentFile).getGitDir(); // .git 폴더 찾기
-            Repository repository = builder.setGitDir(gitDir).readEnvironment().findGitDir().build(); // Repository 객체 생성
-            Ref head = repository.findRef("HEAD");
-            String headBranch = repository.getBranch();
-            // 현재 head 의 branch 는 삭제할 수 없음
-            if (headBranch.equals(branchName)){
-//                showErrorMessage("현재 Head 브랜치는 삭제할 수 없습니다.","CurrentHead chosen error");
-                JOptionPane.showMessageDialog(bmFrame,  "현재 Head 브랜치는 삭제할 수 없습니다.", "CurrentHead chosen error",JOptionPane.ERROR_MESSAGE);
-                return;
-            }
 
-            String[] gitDeleteCommand = {"git", "branch", "-D", branchName};
+            String[] gitDeleteCommand = {"git", "branch", "-d", branchName};
             ProcessBuilder processBuilder = new ProcessBuilder(gitDeleteCommand);
             if(currentFile.isDirectory()){ // 현재 디렉토리 -> 바로 실행
                 processBuilder.directory(currentFile);
@@ -1779,13 +1785,35 @@ public class FileManager {
 
             Process process = processBuilder.start();
 
-            int delStatus = process.waitFor(); // git branch -D 명령어 정상 실행 여부 판단
-            if (delStatus == 0) { // git branch -D 명령어가 정상적으로 실행될 경우
-                JOptionPane.showMessageDialog(gui, "성공적으로 branch를 삭제했습니다.");
+            int delStatus = process.waitFor(); // git branch -d 명령어 정상 실행 여부 판단
+            if (delStatus == 0) { // git branch -d 명령어가 정상적으로 실행될 경우
+                JOptionPane.showMessageDialog(bmFrame, "성공적으로 브랜치를 삭제했습니다.");
                 System.out.println("branch Deleted");
-            } else { //git branch -D 명령어가 정상적으로 실행되지 않았을 경우
-//                showErrorMessage("branch 삭제 중 오류가 발생했습니다.", "git branch delete error");
-                JOptionPane.showMessageDialog(bmFrame,  "branch 삭제 중 오류가 발생했습니다.", "git branch delete error",JOptionPane.ERROR_MESSAGE);
+            } else { //git branch -D 명령어가 정상적으로 실행되지 않았을 경우 , 즉 merge되지 않은 branch 인 경우
+
+                //
+                int result = JOptionPane.showConfirmDialog(bmFrame, "해당 브랜치는 아직 merge되지 않았습니다 정말 삭제하시겠습니까? ", "git not merged branch deletion error", JOptionPane.ERROR_MESSAGE);
+                if(result == JOptionPane.OK_OPTION){
+                    String[] gitHardDeleteCommand = {"git", "branch", "-D", branchName};
+                    ProcessBuilder pBuilder = new ProcessBuilder(gitHardDeleteCommand);
+
+                    if(currentFile.isDirectory()){ // 현재 디렉토리 -> 바로 실행
+                        pBuilder.directory(currentFile);
+                    } else { // 현재 파일 -> 파일의 부모 디렉토리 기준으로 실행
+                        pBuilder.directory(currentFile.getParentFile());
+                    }
+
+                    Process hardDeleteProcess = pBuilder.start();
+                    int delHardProcess = hardDeleteProcess.waitFor();
+
+                    if (delHardProcess ==0){
+                        JOptionPane.showMessageDialog(bmFrame, "성공적으로 브랜치를 삭제했습니다.");
+                    }
+
+                }else{
+                    JOptionPane.showMessageDialog(bmFrame,  "브랜치 삭제를 취소하였습니다.", "User not choose git branch delete",JOptionPane.ERROR_MESSAGE);
+                }
+
             }
 
         }
