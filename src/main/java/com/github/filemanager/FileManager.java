@@ -41,6 +41,17 @@ import javax.swing.filechooser.FileSystemView;
 import javax.swing.table.*;
 import javax.swing.tree.*;
 
+import edu.uci.ics.jung.algorithms.layout.*;
+import edu.uci.ics.jung.graph.DelegateTree;
+import edu.uci.ics.jung.graph.DirectedSparseGraph;
+import edu.uci.ics.jung.graph.Graph;
+import edu.uci.ics.jung.graph.Tree;
+import edu.uci.ics.jung.graph.util.EdgeType;
+import edu.uci.ics.jung.visualization.BasicVisualizationServer;
+import edu.uci.ics.jung.visualization.VisualizationViewer;
+import edu.uci.ics.jung.visualization.decorators.EdgeShape;
+import edu.uci.ics.jung.visualization.decorators.ToStringLabeller;
+import edu.uci.ics.jung.visualization.renderers.Renderer;
 import org.apache.commons.io.FileUtils;
 import org.eclipse.jgit.api.Git;
 import org.eclipse.jgit.api.LogCommand;
@@ -543,7 +554,7 @@ public class FileManager {
             gitCommitHistoryFile.setMnemonic('H');
             gitCommitHistoryFile.addActionListener(new ActionListener() {
                 public void actionPerformed(ActionEvent ae) {
-                    gitCommitLogGraph();
+                    drawGraph();
                 }
             });
             toolBar.add(gitCommitHistoryFile);
@@ -1838,95 +1849,164 @@ public class FileManager {
             Repository repository = builder.setGitDir(gitDir).readEnvironment().findGitDir().build(); // Repository 객체 생성
             Git git = new Git(repository);
 
-            Ref currentBranch = repository.exactRef(repository.getFullBranch()); //현재 브랜치의 정보 불러오기
-            String currentBranchName = currentBranch.getName(); //현재 브랜치의 이름 불러오기 (refs/ ...)
+            Graph<String, String> graph = new DirectedSparseGraph<>();
+            StaticLayout<String, String> layout = new StaticLayout<>(graph);
 
-            Iterable<RevCommit> commits = git.log().add(repository.resolve(currentBranchName)).call(); //현재 브랜치를 기준으로
-            //커밋 오브젝트 불러오기
+            // 커밋 로그 가져오기
+            Iterable<RevCommit> commits = getCommits(repository);
 
-            DefaultTableModel tableModel = new DefaultTableModel();
-            tableModel.addColumn("Commit ID");
-            tableModel.addColumn("Commit Message");
+            // 브랜치 정보 가져오기
+            Map<String, ObjectId> branchMap = getBranches(repository);
 
-            for (RevCommit commit : commits) { //각 커밋 오브젝트들을 불러와 테이블에 표시
-                String commitId = commit.getId().getName();
-                String commitMessage = commit.getShortMessage();
-                Object[] rowData = {commitId, commitMessage};
-                tableModel.addRow(rowData);
-            }
+            // 커밋 그래프 생성
+            createCommitGraph(graph, layout, commits, branchMap);
 
-            JTable logTable = new JTable(tableModel); //커밋 오브젝트를 표기하는 테이블
-            JScrollPane scrollPane = new JScrollPane(logTable);
-
-            scrollPane.setPreferredSize(new Dimension(700, 200));
-            JLabel logLabel = new JLabel("Commit log");
-
-            //밑에 커밋 오브젝트들의 정보를 표시하기 위한 별도의 패널
-            JLabel commitIdLabel = new JLabel();
-            JLabel authorLabel = new JLabel();
-            JLabel dateLabel = new JLabel();
-            JLabel messageLabel = new JLabel();
-
-            // 테이블 행 선택 이벤트 리스너
-            logTable.getSelectionModel().addListSelectionListener(new ListSelectionListener() {
-                @Override
-                public void valueChanged(ListSelectionEvent e) {
-                    if (!e.getValueIsAdjusting()) {
-                        int selectedRow = logTable.getSelectedRow(); //현재 선택한 테이블의 행 가져오기
-                        if (selectedRow != -1) {
-                            String commitId = (String) logTable.getValueAt(selectedRow, 0); //테이블의 커밋 오브젝트 ID를 기준으로 커밋의 정보 불러오기
-                            try{
-                                RevCommit commit = git.getRepository().parseCommit(repository.resolve(commitId)); //커밋 오브젝트 ID를 통해 특정 커밋 오브젝트 정보 불러오기
-                                String author = commit.getAuthorIdent().getName(); //작성자
-                                String date = commit.getAuthorIdent().getWhen().toString(); //커밋 날짜
-                                String message = commit.getFullMessage(); //커밋 메시지
-
-                                // 커밋 정보를 표시하는 JLabel 업데이트
-                                commitIdLabel.setText(commitId);
-                                authorLabel.setText(author);
-                                dateLabel.setText(date);
-                                messageLabel.setText(message);
-                            }catch (IOException e1){
-                                e1.printStackTrace();
-                            }
-
-                        }
-                    }
-                }
-            });
-
-            JPanel commitMainInfo = new JPanel(new BorderLayout(4, 2)); //커밋 정보 패널
-            commitMainInfo.setBorder(new EmptyBorder(0, 6, 0, 6));
-
-            JPanel commitLabel = new JPanel(new GridLayout(0, 1, 2, 2)); //왼쪽의 커밋 정보 분류 레이블
-            commitLabel.setForeground(Color.gray);
-            commitMainInfo.add(commitLabel, BorderLayout.WEST);
-
-            JPanel commitDetail = new JPanel(new GridLayout(0, 1, 2, 2)); //오른쪽의 커밋 디테일 레이블
-            commitMainInfo.add(commitDetail, BorderLayout.CENTER);
-
-            commitLabel.add(new JLabel("Commit ID : ", JLabel.TRAILING)); //레이블 텍스트를 오른쪽으로 정렬
-            commitDetail.add(commitIdLabel);
-            commitLabel.add(new JLabel("Author : ", JLabel.TRAILING));
-            commitDetail.add(authorLabel);
-            commitLabel.add(new JLabel("Date : ", JLabel.TRAILING));
-            commitDetail.add(dateLabel);
-            commitLabel.add(new JLabel("Message : ", JLabel.TRAILING));
-            commitDetail.add(messageLabel);
+            // 그래프 시각화
+            visualizeCommitGraph(graph, layout);
 
 
-
-            JPanel panel = new JPanel(new BorderLayout()); //패널 구성
-            panel.add(logLabel, BorderLayout.NORTH);
-            panel.add(scrollPane, BorderLayout.CENTER);
-            panel.add(commitMainInfo, BorderLayout.SOUTH);
-
-            int optionPane = JOptionPane.showOptionDialog(gui, panel, "Git Commit", JOptionPane.OK_CANCEL_OPTION,JOptionPane.QUESTION_MESSAGE,null,null,JOptionPane.YES_OPTION);
             repository.close();
+
         } catch (IOException | GitAPIException e) {
             e.printStackTrace();
         }
     }
+    private static Iterable<RevCommit> getCommits(Repository repository) throws GitAPIException, IOException {
+        List<RevCommit> commits = new ArrayList<>();
+        try (RevWalk revWalk = new RevWalk(repository)) {
+            RevCommit headCommit = revWalk.parseCommit(repository.resolve("HEAD"));
+            revWalk.markStart(headCommit);
+            for (RevCommit commit : revWalk) {
+                commits.add(commit);
+            }
+        }
+        return commits;
+    }
+
+    private static Map<String, ObjectId> getBranches(Repository repository) throws GitAPIException, IOException {
+        Map<String, ObjectId> branchMap = new HashMap<>();
+        repository.getRefDatabase()
+                .getRefsByPrefix("refs/heads/")
+                .forEach((name) -> branchMap.put(name.toString().substring("refs/heads/".length())6));
+        return branchMap;
+    }
+    private static void createCommitGraph(Graph<String, String> graph, StaticLayout<String, String> layout,
+                                          Iterable<RevCommit> commits, Map<String, ObjectId> branchMap) {
+        Map<ObjectId, String> commitNodeMap = new HashMap<>();
+
+        int x = 50; // 초기 x 좌표
+        int y = 50; // 초기 y 좌표
+
+        for (RevCommit commit : commits) {
+            String commitId = commit.getName();
+            graph.addVertex(commitId);
+            commitNodeMap.put(commit.getId(), commitId);
+
+            // 커밋 노드의 위치 설정
+            layout.setLocation(commitId, x, y);
+
+            // 브랜치 정보 확인
+            for (Map.Entry<String, ObjectId> entry : branchMap.entrySet()) {
+                String branchName = entry.getKey();
+                ObjectId branchObjectId = entry.getValue();
+
+                if (commit.getId().equals(branchObjectId)) {
+                    // 브랜치에 해당하는 커밋인 경우 x 좌표를 50씩 증가시킴
+                    x += 50;
+
+                    // 브랜치와 커밋을 연결하는 엣지 추가
+                    String edgeId = commitId + "_" + branchName;
+                    graph.addEdge(edgeId, branchName, commitId);
+
+                    // 브랜치 노드의 위치 설정
+                    layout.setLocation(branchName, x, y);
+                }
+            }
+
+            // y 좌표를 50 증가시킴
+            y += 50;
+        }
+
+        // 브랜치 간의 merge 관계 표시
+        for (Map.Entry<String, ObjectId> entry : branchMap.entrySet()) {
+            String branchName = entry.getKey();
+            ObjectId branchObjectId = entry.getValue();
+
+            // 브랜치가 merge된 커밋 확인
+            RevCommit mergeCommit = commits.iterator().next();
+            while (mergeCommit != null) {
+                if (mergeCommit.getParentCount() > 1) {
+                    for (RevCommit parent : mergeCommit.getParents()) {
+                        if (parent.getId().equals(branchObjectId)) {
+                            // 브랜치가 merge된 경우
+                            String mergeCommitId = commitNodeMap.get(mergeCommit.getId());
+                            String branchCommitId = commitNodeMap.get(branchObjectId);
+
+                            // merge 대상의 브랜치 커밋에서 merge 커밋으로 화살표가 뻗어나가는 엣지 추가
+                            String edgeId = branchCommitId + "_" + mergeCommitId;
+                            graph.addEdge(edgeId, branchCommitId, mergeCommitId);
+                        }
+                    }
+                }
+                mergeCommit = mergeCommit.getParentCount() > 0 ? mergeCommit.getParent(0) : null;
+            }
+        }
+    }
+    private static void visualizeCommitGraph(Graph<String, String> graph, StaticLayout<String, String> layout) {
+        VisualizationViewer<String, String> vv = new VisualizationViewer<>(layout);
+        vv.setPreferredSize(new Dimension(600, 400));
+        vv.getRenderContext().setVertexLabelTransformer(new ToStringLabeller());
+        vv.getRenderer().getVertexLabelRenderer().setPosition(Renderer.VertexLabel.Position.CNTR);
+
+        // 그래프 시각화
+        // ...
+    }
+
+    private void drawGraph(){
+        Graph<String, String> graph = new DirectedSparseGraph<>();
+        graph.addVertex("A");
+        graph.addVertex("B");
+        graph.addVertex("C");
+        graph.addVertex("D");
+        graph.addVertex("E");
+
+
+        graph.addEdge("AB", "A", "B");
+        graph.addEdge("BC", "B", "C");
+        graph.addEdge("CD", "C", "D");
+        graph.addEdge("BE","B","E");
+        graph.addEdge("DE","D","E");
+
+
+
+// 트리 레이아웃
+        StaticLayout<String, String> layout = new StaticLayout<>(graph);
+
+// 노드 위치 설정
+        layout.setLocation("A", 50, 50);
+        layout.setLocation("B", 50, 100);
+        layout.setLocation("C", 100, 150);
+        layout.setLocation("D", 100, 200);
+        layout.setLocation("E", 50, 250);
+
+// 그래프 시각화
+        BasicVisualizationServer<String, String> vv = new BasicVisualizationServer<>(layout);
+        vv.getRenderContext().setVertexLabelTransformer(new ToStringLabeller());
+        vv.getRenderContext().setEdgeShapeTransformer(EdgeShape.line(graph));
+
+
+
+        JFrame frame = new JFrame();
+        frame.setDefaultCloseOperation(JFrame.DISPOSE_ON_CLOSE);
+        frame.getContentPane().add(vv);
+        frame.pack();
+        frame.setVisible(true);
+
+    }
+
+
+
+
 
     private void showErrorMessage(String errorMessage, String errorTitle) {
         JOptionPane.showMessageDialog(gui, errorMessage, errorTitle, JOptionPane.ERROR_MESSAGE);
