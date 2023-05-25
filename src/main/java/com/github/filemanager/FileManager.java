@@ -1700,9 +1700,6 @@ public class FileManager {
                     String selectedBranch = table.getValueAt(selectedRow, 0).toString(); // 선택된 셀의 branch 이름 , 어느곳을 선택해도 branch name 반환
 
                     renameGitBranch(selectedBranch);
-//                    bmFrame.dispose();
-//                    gitBranchManagerFile();
-
                 }
             });
 
@@ -1738,7 +1735,6 @@ public class FileManager {
                     }
 
                     deleteGitBranch(selectedBranch); // delete 로직수행
-                    bmFrame.dispose();
                 }
             });
 
@@ -1803,6 +1799,8 @@ public class FileManager {
             if (delStatus == 0) { // git branch -d 명령어가 정상적으로 실행될 경우
                 JOptionPane.showMessageDialog(bmFrame, "성공적으로 브랜치를 삭제했습니다.");
                 System.out.println("branch Deleted");
+                bmFrame.dispose();
+                gitBranchManagerFile();
             } else { //git branch -D 명령어가 정상적으로 실행되지 않았을 경우 , 즉 merge되지 않은 branch 인 경우
 
                 //
@@ -1821,6 +1819,8 @@ public class FileManager {
                     int delHardProcess = hardDeleteProcess.waitFor();
 
                     if (delHardProcess ==0){
+                        bmFrame.dispose();
+                        gitBranchManagerFile();
                         JOptionPane.showMessageDialog(bmFrame, "성공적으로 브랜치를 삭제했습니다.");
                     }
 
@@ -1897,6 +1897,8 @@ public class FileManager {
                     if (mvStatus == 0) { // git branch -m 명령어가 정상적으로 실행될 경우
                         JOptionPane.showMessageDialog(bmFrame, "성공적으로 branch 이름을  변경했습니다.");
                         System.out.println("Old branch name : " + branchName + " new branch name : " + newBranchName);
+                        bmFrame.dispose();
+                        gitBranchManagerFile();
                     } else { //git branch -m 명령어가 정상적으로 실행되지 않았을 경우
                         JOptionPane.showMessageDialog(bmFrame, "branch 변경 중 오류가 발생했습니다.", "git branch -m error", JOptionPane.ERROR_MESSAGE);
                     }
