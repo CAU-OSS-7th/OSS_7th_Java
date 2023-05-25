@@ -1748,7 +1748,34 @@ public class FileManager {
             checkoutButton.addActionListener(new ActionListener() { // checkout branch 버튼 클릭 시
                 @Override
                 public void actionPerformed(ActionEvent e) {
-                    // checkoutGitBranch();
+                    //선택한 branch 이름을 받는 과정
+                    int selectedRow = table.getSelectedRow(); // 선택된 행의 인덱스
+                    int selectedColumn = table.getSelectedColumn(); // 선택된 열의 인덱스
+
+                    // 선택된 branch가 없는 경우 예외처리
+                    if (selectedRow == -1 || selectedColumn ==-1){
+                        JOptionPane.showMessageDialog(bmFrame, "선택한 브랜치가 없습니다. 브랜치를 선택하고 다시 시도해주세요", "Branch not selected error", JOptionPane.ERROR_MESSAGE);
+                        return;
+                    }
+                    String selectedBranch = table.getValueAt(selectedRow, 0).toString(); // 선택된 셀의 branch 이름 , 어느곳을 선택해도 branch name 반환
+
+                    FileRepositoryBuilder builder = new FileRepositoryBuilder();
+                    File gitDir = builder.findGitDir(currentFile).getGitDir(); // .git 폴더 찾기
+
+                    try {
+                        Repository repository = builder.setGitDir(gitDir).readEnvironment().findGitDir().build(); // Repository 객체 생성
+                        Ref head = repository.findRef("HEAD");
+                        String headBranch = repository.getBranch();
+                        // 현재 head 의 branch로는 checkout하지 않음.
+                        if(selectedBranch.compareTo(headBranch) == 0){
+                            JOptionPane.showMessageDialog(bmFrame, "이미 " + selectedBranch + "에 있습니다.", "Already in selected Branch", JOptionPane.ERROR_MESSAGE);
+                            return;
+                        }
+                    }catch (IOException err){
+                        err.printStackTrace();
+                    }
+
+                    checkoutGitBranch(selectedBranch);
                 }
             });
 
@@ -1779,6 +1806,57 @@ public class FileManager {
         return false;
     }
 
+    /**
+     * git checkout branch
+     */
+    private void checkoutGitBranch(String branchName){
+        try{
+            String[] gitCheckoutCommand = {"git", "checkout", branchName};
+            ProcessBuilder processBuilder = new ProcessBuilder(gitCheckoutCommand);
+            if(currentFile.isDirectory()){ // 현재 디렉토리 -> 바로 실행
+                processBuilder.directory(currentFile);
+            } else { // 현재 파일 -> 파일의 부모 디렉토리 기준으로 실행
+                processBuilder.directory(currentFile.getParentFile());
+            }
+
+            Process process = processBuilder.start();
+
+            int checkoutStatus = process.waitFor(); // git checkout branch 명령어 정상 실행 여부 판단
+            if (checkoutStatus == 0) { // git checkout branch 명령어가 정상적으로 실행될 경우
+                JOptionPane.showMessageDialog(bmFrame, "선택 Branch로 checkout하였습니다.");
+                System.out.println("Checkout to selected Branch");
+
+                FileRepositoryBuilder builder = new FileRepositoryBuilder();
+                File gitDir = builder.findGitDir(currentFile).getGitDir(); // .git 폴더 찾기
+
+                try {//전체 gui에서 current branch 명 갱신해주기.
+                    Repository repository = builder.setGitDir(gitDir).readEnvironment().findGitDir().build(); // Repository 객체 생성
+                    if(gitCurrentBranch != null) { // null이 아닐 경우에만 branch명 갱신
+                        gitCurrentBranch.setText("Current Git Branch: " + repository.getBranch()); // branch명 갱신
+                    }
+                }catch (IOException err){
+                    err.printStackTrace();
+                }
+
+                //중앙 탐색기에서 현재 브랜치의 파일들 렌더링해주기.
+                try {
+                    renderGitFileStatus(); //스테이지 했을 경우, 파일에 변화가 일어났으므로 렌더링
+                    TreePath parentPath = findTreePath(currentFile);
+                    DefaultMutableTreeNode parentNode = (DefaultMutableTreeNode) parentPath.getLastPathComponent();
+                    showChildren(parentNode);
+                } catch (IOException | GitAPIException e1) {
+                    e1.printStackTrace();
+                }
+                gui.repaint();
+
+            }else{
+                showErrorMessage("선택 Branch로 Checkout하는 과정에서 오류가 발생하였습니다.","git checkout branch error");
+            }
+        }
+        catch(IOException | NullPointerException | InterruptedException e){
+            e.printStackTrace();
+        }
+    }
     /**
      * git branch 삭제 로직
      */
