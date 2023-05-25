@@ -1823,7 +1823,7 @@ public class FileManager {
 
             int checkoutStatus = process.waitFor(); // git checkout branch 명령어 정상 실행 여부 판단
             if (checkoutStatus == 0) { // git checkout branch 명령어가 정상적으로 실행될 경우
-                JOptionPane.showMessageDialog(bmFrame, "선택 Branch로 checkout하였습니다.");
+                JOptionPane.showMessageDialog(bmFrame, branchName +" branch로 checkout하였습니다.");
                 System.out.println("Checkout to selected Branch");
 
                 FileRepositoryBuilder builder = new FileRepositoryBuilder();
