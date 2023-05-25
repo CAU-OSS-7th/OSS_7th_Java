@@ -1688,7 +1688,21 @@ public class FileManager {
             renameBranchButton.addActionListener(new ActionListener() { // rename branch 버튼 클릭 시
                 @Override
                 public void actionPerformed(ActionEvent e) {
-                    // renameGitBranch();
+                    //선택한 branch 이름을 받는 과정
+                    int selectedRow = table.getSelectedRow(); // 선택된 행의 인덱스
+                    int selectedColumn = table.getSelectedColumn(); // 선택된 열의 인덱스
+
+                    // 선택된 branch가 없는 경우 예외처리
+                    if (selectedRow == -1 || selectedColumn ==-1){
+                        JOptionPane.showMessageDialog(bmFrame, "선택한 브랜치가 없습니다. 브랜치를 선택하고 다시 시도해주세요", "Branch not selected error", JOptionPane.ERROR_MESSAGE);
+                        return;
+                    }
+                    String selectedBranch = table.getValueAt(selectedRow, 0).toString(); // 선택된 셀의 branch 이름 , 어느곳을 선택해도 branch name 반환
+
+                    renameGitBranch(selectedBranch);
+//                    bmFrame.dispose();
+//                    gitBranchManagerFile();
+
                 }
             });
 
@@ -1820,6 +1834,85 @@ public class FileManager {
         catch(IOException | NullPointerException | InterruptedException e){
             e.printStackTrace();
         }
+    }
+
+    /**
+     * git branch rename 로직
+     */
+    private void renameGitBranch(String branchName){
+        JPanel rnPanel = new JPanel(new GridLayout(1, 4));
+        JLabel branchname = new JLabel(" new branch name:");
+        branchname.setPreferredSize(new Dimension(50, 20));
+
+        JTextField textField = new JTextField();
+        textField.setPreferredSize(new Dimension(100, 20));
+        rnPanel.add(branchname);
+        rnPanel.add(textField);
+        rnPanel.setPreferredSize(new Dimension(300, 20));
+
+        //동작을 구현할 buttonPanel
+        JButton okButton = new JButton("Ok");
+        JButton cancelButton = new JButton("Cancel");
+        JPanel buttonPanel = new JPanel(new GridLayout());
+        buttonPanel.add(cancelButton);
+        buttonPanel.add(okButton);
+
+        // Panel들을 포함할 Frame
+        JFrame rnFrame = new JFrame();
+        rnFrame.setLayout(new BorderLayout());
+        rnFrame.add(rnPanel, BorderLayout.CENTER);
+        rnFrame.add(buttonPanel, BorderLayout.SOUTH);
+        rnFrame.setVisible(true);
+        rnFrame.pack();
+        rnFrame.setLocationRelativeTo(null);
+
+        // okButton 동작. 공란과 이미 존재하는 브랜치에 대한 검사. 이상없을 시 git branch 명령어 실행
+        okButton.addActionListener(new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                String newBranchName = textField.getText();
+                if (newBranchName.isEmpty()) { // branch명 공란 검사
+                    rnFrame.dispose();
+                    JOptionPane.showMessageDialog(bmFrame,"branch명은 공백이 될 수 없습니다.","git branch -m error",JOptionPane.ERROR_MESSAGE);
+                    return;
+                }
+                if (ifSameNameExistInBranch(newBranchName)) {// 이미 git에 존재하는 branch인지 검사
+                    rnFrame.dispose();
+                    JOptionPane.showMessageDialog(bmFrame,"이미 존재하는 branch명입니다.","git branch -m error",JOptionPane.ERROR_MESSAGE);
+                    return;
+                }
+                try { // git branch -m 명령어 실행
+                    rnFrame.dispose();
+                    String[] gitRnCommand = {"git", "branch", "-m", branchName, newBranchName};
+                    ProcessBuilder processBuilder = new ProcessBuilder(gitRnCommand);
+
+                    if (currentFile.isDirectory()) { // 현재 디렉토리 -> 바로 실행
+                        processBuilder.directory(currentFile);
+                    } else { // 현재 파일 -> 파일의 부모 디렉토리 기준으로 실행
+                        processBuilder.directory(currentFile.getParentFile());
+                    }
+                    Process process = processBuilder.start();
+
+                    int mvStatus = process.waitFor(); // git branch -m 명령어 정상 실행 여부 판단
+                    if (mvStatus == 0) { // git branch -m 명령어가 정상적으로 실행될 경우
+                        JOptionPane.showMessageDialog(bmFrame, "성공적으로 branch 이름을  변경했습니다.");
+                        System.out.println("Old branch name : " + branchName + " new branch name : " + newBranchName);
+                    } else { //git branch -m 명령어가 정상적으로 실행되지 않았을 경우
+                        JOptionPane.showMessageDialog(bmFrame, "branch 변경 중 오류가 발생했습니다.", "git branch -m error", JOptionPane.ERROR_MESSAGE);
+                    }
+                } catch (InterruptedException | IOException e2) {
+                    e2.printStackTrace();
+                }
+
+            }
+        });
+
+        cancelButton.addActionListener(new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                rnFrame.dispose();
+            }
+        });
     }
 
     private void gitCommitLogGraph() {
