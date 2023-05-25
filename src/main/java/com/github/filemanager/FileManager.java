@@ -2422,6 +2422,7 @@ public class FileManager {
                     showChildren(parentNode);
                 } else { //git clone 명령어가 정상적으로 실행되지 않았을 경우
                     showErrorMessage("파일을 Clone하는 과정에서 오류가 발생했습니다.", "git clone error");
+                    return;
                 }
             }
 
