@@ -1749,6 +1749,22 @@ public class FileManager {
                     }
                     String selectedBranch = table.getValueAt(selectedRow, 0).toString(); // 선택된 셀의 branch 이름 , 어느곳을 선택해도 branch name 반환
 
+                    FileRepositoryBuilder builder = new FileRepositoryBuilder();
+                    File gitDir = builder.findGitDir(currentFile).getGitDir(); // .git 폴더 찾기
+
+                    try {
+                        Repository repository = builder.setGitDir(gitDir).readEnvironment().findGitDir().build(); // Repository 객체 생성
+                        Ref head = repository.findRef("HEAD");
+                        String headBranch = repository.getBranch();
+                        // 현재 head 의 branch로는 checkout하지 않음.
+                        if(selectedBranch.compareTo(headBranch) == 0){
+                            JOptionPane.showMessageDialog(bmFrame, "이미 " + selectedBranch + "에 있습니다.", "Already in selected Branch", JOptionPane.ERROR_MESSAGE);
+                            return;
+                        }
+                    }catch (IOException err){
+                        err.printStackTrace();
+                    }
+
                     checkoutGitBranch(selectedBranch);
                 }
             });
