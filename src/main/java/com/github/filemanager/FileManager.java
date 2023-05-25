@@ -1803,7 +1803,7 @@ public class FileManager {
                 FileRepositoryBuilder builder = new FileRepositoryBuilder();
                 File gitDir = builder.findGitDir(currentFile).getGitDir(); // .git 폴더 찾기
 
-                try {
+                try {//전체 gui에서 current branch 명 갱신해주기.
                     Repository repository = builder.setGitDir(gitDir).readEnvironment().findGitDir().build(); // Repository 객체 생성
                     if(gitCurrentBranch != null) { // null이 아닐 경우에만 branch명 갱신
                         gitCurrentBranch.setText("Current Git Branch: " + repository.getBranch()); // branch명 갱신
@@ -1811,6 +1811,17 @@ public class FileManager {
                 }catch (IOException err){
                     err.printStackTrace();
                 }
+
+                //중앙 탐색기에서 현재 브랜치의 파일들 렌더링해주기.
+                try {
+                    renderGitFileStatus(); //스테이지 했을 경우, 파일에 변화가 일어났으므로 렌더링
+                    TreePath parentPath = findTreePath(currentFile);
+                    DefaultMutableTreeNode parentNode = (DefaultMutableTreeNode) parentPath.getLastPathComponent();
+                    showChildren(parentNode);
+                } catch (IOException | GitAPIException e1) {
+                    e1.printStackTrace();
+                }
+                gui.repaint();
 
             }else{
                 showErrorMessage("선택 Branch로 Checkout하는 과정에서 오류가 발생하였습니다.","git checkout branch error");
