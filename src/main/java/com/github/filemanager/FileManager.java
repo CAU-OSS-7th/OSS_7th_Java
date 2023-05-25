@@ -42,17 +42,16 @@ import javax.swing.table.*;
 import javax.swing.tree.*;
 
 import org.apache.commons.io.FileUtils;
-import org.eclipse.jgit.api.Git;
-import org.eclipse.jgit.api.LogCommand;
-import org.eclipse.jgit.api.Status;
-import org.eclipse.jgit.api.errors.GitAPIException;
-import org.eclipse.jgit.api.errors.NoHeadException;
+import org.eclipse.jgit.api.*;
+import org.eclipse.jgit.api.MergeCommand;
+import org.eclipse.jgit.api.errors.*;
 import org.eclipse.jgit.errors.IncorrectObjectTypeException;
 import org.eclipse.jgit.errors.MissingObjectException;
 import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.Ref;
 import org.eclipse.jgit.lib.Repository;
 import org.eclipse.jgit.lib.RepositoryBuilder;
+import org.eclipse.jgit.merge.MergeStrategy;
 import org.eclipse.jgit.revplot.AbstractPlotRenderer;
 import org.eclipse.jgit.revwalk.RevCommit;
 import org.eclipse.jgit.revwalk.RevObject;
@@ -1741,7 +1740,35 @@ public class FileManager {
             mergeBranchButton.addActionListener(new ActionListener() { // merge branch 버튼 클릭 시
                 @Override
                 public void actionPerformed(ActionEvent e) {
-                    // mergeGitBranch();
+                    //선택한 branch 이름을 받는 과정
+                    int selectedRow = table.getSelectedRow(); // 선택된 행의 인덱스
+                    int selectedColumn = table.getSelectedColumn(); // 선택된 열의 인덱스
+
+                    // 선택된 branch가 없는 경우 예외처리
+                    if (selectedRow == -1 || selectedColumn ==-1){
+                        JOptionPane.showMessageDialog(bmFrame, "선택한 브랜치가 없습니다. Merge할 브랜치를 선택하고 다시 시도해주세요", "Branch not selected error", JOptionPane.ERROR_MESSAGE);
+                        return;
+                    }
+                    String selectedBranch = table.getValueAt(selectedRow, 0).toString(); // 선택된 셀의 branch 이름 , 어느곳을 선택해도 branch name 반환
+
+                    //삭제를 하면 안되는 경우들에 대한 얘외처리
+                    FileRepositoryBuilder builder = new FileRepositoryBuilder();
+                    File gitDir = builder.findGitDir(currentFile).getGitDir(); // .git 폴더 찾기
+
+                    try {
+                        Repository repository = builder.setGitDir(gitDir).readEnvironment().findGitDir().build(); // Repository 객체 생성
+                        Ref head = repository.findRef("HEAD");
+                        String headBranch = repository.getBranch();
+                        // 현재 head 의 branch 는 삭제할 수 없음
+                        if (headBranch.equals(selectedBranch)){
+                            JOptionPane.showMessageDialog(bmFrame,  "현재 Head 브랜치는 삭제할 수 없습니다.", "Current Head chosen error",JOptionPane.ERROR_MESSAGE);
+                            return;
+                        }
+                    }catch (IOException err){
+                        err.printStackTrace();
+                    }
+
+                    mergeGitBranch(selectedBranch); // merge 로직수행
                 }
             });
 
@@ -1862,7 +1889,6 @@ public class FileManager {
      */
     private void deleteGitBranch(String branchName){
         try{
-
             String[] gitDeleteCommand = {"git", "branch", "-d", branchName};
             ProcessBuilder processBuilder = new ProcessBuilder(gitDeleteCommand);
             if(currentFile.isDirectory()){ // 현재 디렉토리 -> 바로 실행
@@ -1993,6 +2019,63 @@ public class FileManager {
                 rnFrame.dispose();
             }
         });
+    }
+
+    /**
+     * git branch merge 로직
+     */
+    private void mergeGitBranch(String branchName){// merge할 상대의 브랜치 이름
+        try{
+            FileRepositoryBuilder builder = new FileRepositoryBuilder();
+            File gitDir = builder.findGitDir(currentFile).getGitDir(); // .git 폴더 찾기
+            Repository repository = builder.setGitDir(gitDir).readEnvironment().findGitDir().build(); // Repository 객체 생성
+            Git git = new Git(repository);
+            String currentBranch = repository.getBranch(); // 현재 브랜치 이름
+            // 먼저 병합 대상 브랜치로 체크아웃
+            Ref mergeTargetBranch = repository.findRef(currentBranch);
+            git.checkout().setName(mergeTargetBranch.getName()).call();
+
+            // 병합을 수행할 브랜치와 병합
+            MergeResult mergeResult = git.merge()
+                    .include(repository.findRef(branchName)) // 병합할 브랜치의 이름 설정
+                    .setStrategy(MergeStrategy.RESOLVE)
+                    .call();
+            if (mergeResult.getConflicts() != null) {// merge 중 conflict 이 난 경우
+                String confiltFilePaths = "다음과 같은 경로에 충돌하는 파일이 발생하므로 Merge를 중단합니다.\n\n";
+                // conflict이 일어난 파일들의 경로를 저장하여 경고 메세지를 띄워줌
+                for (String conflictPath : mergeResult.getConflicts().keySet()) {
+                    System.out.println("Conflict: " + gitDir.getParent()+"/"+conflictPath);
+                    confiltFilePaths += (gitDir.getParent()+"/"+conflictPath+"\n");
+                }
+                JOptionPane.showMessageDialog(bmFrame, confiltFilePaths, "Unmerged Path",JOptionPane.ERROR_MESSAGE);
+
+                //merge 취소하는 과정
+
+                String[] gitMergeAbortCommand = {"git", "merge", "--abort"};
+                ProcessBuilder pBuilder = new ProcessBuilder(gitMergeAbortCommand);
+
+                if(currentFile.isDirectory()){ // 현재 디렉토리 -> 바로 실행
+                    pBuilder.directory(currentFile);
+                } else { // 현재 파일 -> 파일의 부모 디렉토리 기준으로 실행
+                    pBuilder.directory(currentFile.getParentFile());
+                }
+                Process hardDeleteProcess = pBuilder.start();
+                int mergeAbortProcess = hardDeleteProcess.waitFor();
+                if (mergeAbortProcess ==0){ // merge abort 성공적 수행
+                    JOptionPane.showMessageDialog(bmFrame, " Merge를 취소하였습니다.");
+                }
+                else{
+                    JOptionPane.showMessageDialog(bmFrame,  "Merge를 취소하는 중 오류가 발생하였습니다.", "Merge --abort failed",JOptionPane.ERROR_MESSAGE);
+                }
+            } else {
+                // merge가 정상적으로 끝난 경우
+                JOptionPane.showMessageDialog(bmFrame, "성공적으로 브랜치를 병합(merge)했습니다.");
+            }
+
+        } catch (GitAPIException | IOException | InterruptedException e) {
+            e.printStackTrace();
+        }
+
     }
 
     private void gitCommitLogGraph() {
