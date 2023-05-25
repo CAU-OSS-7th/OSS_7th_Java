@@ -1850,7 +1850,7 @@ public class FileManager {
 
             int checkoutStatus = process.waitFor(); // git checkout branch 명령어 정상 실행 여부 판단
             if (checkoutStatus == 0) { // git checkout branch 명령어가 정상적으로 실행될 경우
-                JOptionPane.showMessageDialog(bmFrame, "선택 Branch로 checkout하였습니다.");
+                JOptionPane.showMessageDialog(bmFrame, branchName +" branch로 checkout하였습니다.");
                 System.out.println("Checkout to selected Branch");
 
                 FileRepositoryBuilder builder = new FileRepositoryBuilder();
@@ -2342,6 +2342,8 @@ public class FileManager {
         }
         return created;
     }
+
+    JFrame cloneFrame;
     private void gitCloneFile(){
         /*
         1.git clone 버튼을 누르면 나오는 공통된 창을 만들기.
@@ -2360,7 +2362,7 @@ public class FileManager {
         }//
 
         //clone 버튼 클릭시 띄울 프레임
-        JFrame cloneFrame = new JFrame("git clone(local directory: " + currentFile.getName() + ")");cloneFrame.setLayout(new BorderLayout());
+        cloneFrame = new JFrame("git clone(local directory: " + currentFile.getName() + ")");cloneFrame.setLayout(new BorderLayout());
 
         //public과 private 중 어떤 유형의 레포를 clone할 지 선택하고 유형에 따른 입력값을 달리하기 위한 옵션구현.
         JPanel publicPanel, privatePanel, buttonPanel, jpRadioButtons;
@@ -2452,7 +2454,7 @@ public class FileManager {
     }
     private void gitClonePublic(String RepositoryURL){
         try{
-            int result = JOptionPane.showConfirmDialog(gui, "Public Repository를 Clone하시겠습니까?", "git clone public", JOptionPane.ERROR_MESSAGE);
+            int result = JOptionPane.showConfirmDialog(cloneFrame, "Public Repository를 Clone하시겠습니까?", "git clone public", JOptionPane.ERROR_MESSAGE);
 
             if (result == JOptionPane.OK_OPTION) { // "예" 클릭 시 git clone 명령어 실행
                 String[] gitCloneCommand = {"git", "clone", RepositoryURL};
@@ -2462,7 +2464,7 @@ public class FileManager {
                 int cloneStatus = process.waitFor(); //git clone 명령어 정상 실행 여부
 
                 if (cloneStatus == 0) { // git clone 명령어가 정상적으로 실행되어 status가 0일 경우
-                    JOptionPane.showMessageDialog(gui, "성공적으로 Repository를 clone 했습니다.");
+                    JOptionPane.showMessageDialog(cloneFrame, "성공적으로 Repository를 clone 했습니다.");
                     System.out.println("Cloned");
 
                     TreePath parentPath = findTreePath(currentFile);
@@ -2485,7 +2487,7 @@ public class FileManager {
     }
     private void gitClonePrivate(String RepositoryURL, String id, String token){
         try{
-            int result = JOptionPane.showConfirmDialog(gui, "Private Repository를 Clone하시겠습니까?", "git clone private", JOptionPane.ERROR_MESSAGE);
+            int result = JOptionPane.showConfirmDialog(cloneFrame, "Private Repository를 Clone하시겠습니까?", "git clone private", JOptionPane.ERROR_MESSAGE);
 
             if (result == JOptionPane.OK_OPTION) { // "예" 클릭 시 git clone 명령어 실행
                 String[] gitCloneCommand = {"git", "clone", "https://" + id + ":" + token + "@" + RepositoryURL.substring(8)};
@@ -2495,7 +2497,7 @@ public class FileManager {
                 int cloneStatus = process.waitFor(); //git clone 명령어 정상 실행 여부
 
                 if (cloneStatus == 0) { // git clone 명령어가 정상적으로 실행되어 status가 0일 경우
-                    JOptionPane.showMessageDialog(gui, "성공적으로 Repository를 clone 했습니다.");
+                    JOptionPane.showMessageDialog(cloneFrame, "성공적으로 Repository를 clone 했습니다.");
                     System.out.println("Cloned");
 
                     TreePath parentPath = findTreePath(currentFile);
@@ -2505,6 +2507,7 @@ public class FileManager {
                     showChildren(parentNode);
                 } else { //git clone 명령어가 정상적으로 실행되지 않았을 경우
                     showErrorMessage("파일을 Clone하는 과정에서 오류가 발생했습니다.", "git clone error");
+                    return;
                 }
             }
 
