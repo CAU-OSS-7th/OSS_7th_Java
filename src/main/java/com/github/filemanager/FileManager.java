@@ -1761,7 +1761,7 @@ public class FileManager {
                         String headBranch = repository.getBranch();
                         // 현재 head 의 branch 는 삭제할 수 없음
                         if (headBranch.equals(selectedBranch)){
-                            JOptionPane.showMessageDialog(bmFrame,  "현재 Head 브랜치는 삭제할 수 없습니다.", "Current Head chosen error",JOptionPane.ERROR_MESSAGE);
+                            JOptionPane.showMessageDialog(bmFrame,  "현재 Head 브랜치와 병합할 브랜치가 같습니다.", "Current Head chosen error",JOptionPane.ERROR_MESSAGE);
                             return;
                         }
                     }catch (IOException err){
