@@ -1693,7 +1693,7 @@ public class FileManager {
 
                     // 선택된 branch가 없는 경우 예외처리
                     if (selectedRow == -1 || selectedColumn ==-1){
-                        JOptionPane.showMessageDialog(bmFrame, "선택한 브랜치가 없습니다. 브랜치를 선택하고 다시 시도해주세요", "Branch not selected error", JOptionPane.ERROR_MESSAGE);
+                        JOptionPane.showMessageDialog(bmFrame, "선택한 branch가 없습니다. branch를 선택하고 다시 시도해주세요", "Branch not selected error", JOptionPane.ERROR_MESSAGE);
                         return;
                     }
                     String selectedBranch = table.getValueAt(selectedRow, 0).toString(); // 선택된 셀의 branch 이름 , 어느곳을 선택해도 branch name 반환
@@ -1711,7 +1711,7 @@ public class FileManager {
 
                     // 선택된 branch가 없는 경우 예외처리
                     if (selectedRow == -1 || selectedColumn ==-1){
-                        JOptionPane.showMessageDialog(bmFrame, "선택한 브랜치가 없습니다. 브랜치를 선택하고 다시 시도해주세요", "Branch not selected error", JOptionPane.ERROR_MESSAGE);
+                        JOptionPane.showMessageDialog(bmFrame, "선택한 branch가 없습니다. branch를 선택하고 다시 시도해주세요", "Branch not selected error", JOptionPane.ERROR_MESSAGE);
                         return;
                     }
                     String selectedBranch = table.getValueAt(selectedRow, 0).toString(); // 선택된 셀의 branch 이름 , 어느곳을 선택해도 branch name 반환
@@ -1726,7 +1726,7 @@ public class FileManager {
                         String headBranch = repository.getBranch();
                         // 현재 head 의 branch 는 삭제할 수 없음
                         if (headBranch.equals(selectedBranch)){
-                            JOptionPane.showMessageDialog(bmFrame,  "현재 Head 브랜치는 삭제할 수 없습니다.", "Current Head chosen error",JOptionPane.ERROR_MESSAGE);
+                            JOptionPane.showMessageDialog(bmFrame,  "현재 Head branch는 삭제할 수 없습니다.", "Current Head chosen error",JOptionPane.ERROR_MESSAGE);
                             return;
                         }
                     }catch (IOException err){
@@ -1746,7 +1746,7 @@ public class FileManager {
 
                     // 선택된 branch가 없는 경우 예외처리
                     if (selectedRow == -1 || selectedColumn ==-1){
-                        JOptionPane.showMessageDialog(bmFrame, "선택한 브랜치가 없습니다. Merge할 브랜치를 선택하고 다시 시도해주세요", "Branch not selected error", JOptionPane.ERROR_MESSAGE);
+                        JOptionPane.showMessageDialog(bmFrame, "선택한 branch가 없습니다. Merge할 target branch를 선택하고 다시 시도해주세요", "Branch not selected error", JOptionPane.ERROR_MESSAGE);
                         return;
                     }
                     String selectedBranch = table.getValueAt(selectedRow, 0).toString(); // 선택된 셀의 branch 이름 , 어느곳을 선택해도 branch name 반환
@@ -1761,7 +1761,7 @@ public class FileManager {
                         String headBranch = repository.getBranch();
                         // 현재 head 의 branch 는 삭제할 수 없음
                         if (headBranch.equals(selectedBranch)){
-                            JOptionPane.showMessageDialog(bmFrame,  "현재 Head 브랜치와 병합할 브랜치가 같습니다.", "Current Head chosen error",JOptionPane.ERROR_MESSAGE);
+                            JOptionPane.showMessageDialog(bmFrame,  "현재 Head branch와 Merge할 target branch가 같습니다.", "Current Head chosen error",JOptionPane.ERROR_MESSAGE);
                             return;
                         }
                     }catch (IOException err){
@@ -1808,7 +1808,9 @@ public class FileManager {
 
             // branchmanager 화면에 출력
             bmFrame.add(panel);
-            bmFrame.setVisible(true); bmFrame.setLocationRelativeTo(null); bmFrame.setPreferredSize(new Dimension(700, 450));
+            bmFrame.setVisible(true);
+            bmFrame.setLocationRelativeTo(null);
+            bmFrame.setPreferredSize(new Dimension(700, 300));
             bmFrame.pack();
         } catch (IOException | GitAPIException e) {
             e.printStackTrace();
@@ -1850,7 +1852,7 @@ public class FileManager {
 
             int checkoutStatus = process.waitFor(); // git checkout branch 명령어 정상 실행 여부 판단
             if (checkoutStatus == 0) { // git checkout branch 명령어가 정상적으로 실행될 경우
-                JOptionPane.showMessageDialog(bmFrame, branchName +" branch로 checkout하였습니다.");
+                JOptionPane.showMessageDialog(bmFrame, branchName +" branch로 Checkout하였습니다.");
                 System.out.println("Checkout to selected Branch");
 
                 FileRepositoryBuilder builder = new FileRepositoryBuilder();
@@ -1877,7 +1879,7 @@ public class FileManager {
                 gui.repaint();
 
             }else{
-                showErrorMessage("선택 Branch로 Checkout하는 과정에서 오류가 발생하였습니다.","git checkout branch error");
+                showErrorMessage("선택한 Branch로 Checkout하는 과정에서 오류가 발생하였습니다.","git checkout branch error");
             }
         }
         catch(IOException | NullPointerException | InterruptedException e){
@@ -1962,7 +1964,7 @@ public class FileManager {
         buttonPanel.add(okButton);
 
         // Panel들을 포함할 Frame
-        JFrame rnFrame = new JFrame();
+        JFrame rnFrame = new JFrame("git rename branch");
         rnFrame.setLayout(new BorderLayout());
         rnFrame.add(rnPanel, BorderLayout.CENTER);
         rnFrame.add(buttonPanel, BorderLayout.SOUTH);
@@ -1999,7 +2001,7 @@ public class FileManager {
 
                     int mvStatus = process.waitFor(); // git branch -m 명령어 정상 실행 여부 판단
                     if (mvStatus == 0) { // git branch -m 명령어가 정상적으로 실행될 경우
-                        JOptionPane.showMessageDialog(bmFrame, "성공적으로 branch 이름을  변경했습니다.");
+                        JOptionPane.showMessageDialog(bmFrame, "성공적으로 branch 이름을 변경했습니다.");
                         System.out.println("Old branch name : " + branchName + " new branch name : " + newBranchName);
                         bmFrame.dispose();
                         gitBranchManagerFile();
