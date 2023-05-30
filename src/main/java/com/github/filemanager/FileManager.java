@@ -41,37 +41,23 @@ import javax.swing.filechooser.FileSystemView;
 import javax.swing.table.*;
 import javax.swing.tree.*;
 
-import edu.uci.ics.jung.algorithms.layout.*;
-import edu.uci.ics.jung.graph.DelegateTree;
-import edu.uci.ics.jung.graph.DirectedSparseGraph;
-import edu.uci.ics.jung.graph.Graph;
-import edu.uci.ics.jung.graph.Tree;
-import edu.uci.ics.jung.graph.util.EdgeType;
-import edu.uci.ics.jung.visualization.BasicVisualizationServer;
-import edu.uci.ics.jung.visualization.VisualizationViewer;
-import edu.uci.ics.jung.visualization.decorators.EdgeShape;
-import edu.uci.ics.jung.visualization.decorators.ToStringLabeller;
-import edu.uci.ics.jung.visualization.renderers.Renderer;
 import org.apache.commons.io.FileUtils;
-import org.eclipse.jgit.api.Git;
-import org.eclipse.jgit.api.ListBranchCommand;
-import org.eclipse.jgit.api.LogCommand;
-import org.eclipse.jgit.api.Status;
-import org.eclipse.jgit.api.errors.GitAPIException;
-import org.eclipse.jgit.api.errors.NoHeadException;
+import org.eclipse.jgit.api.*;
+import org.eclipse.jgit.api.MergeCommand;
+import org.eclipse.jgit.api.errors.*;
 import org.eclipse.jgit.errors.IncorrectObjectTypeException;
 import org.eclipse.jgit.errors.MissingObjectException;
-import org.eclipse.jgit.internal.storage.commitgraph.CommitGraph;
-import org.eclipse.jgit.internal.storage.commitgraph.CommitGraphLoader;
 import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.Ref;
 import org.eclipse.jgit.lib.Repository;
 import org.eclipse.jgit.lib.RepositoryBuilder;
-import org.eclipse.jgit.revplot.*;
-import org.eclipse.jgit.revwalk.*;
+import org.eclipse.jgit.merge.MergeStrategy;
+import org.eclipse.jgit.revplot.AbstractPlotRenderer;
+import org.eclipse.jgit.revwalk.RevCommit;
+import org.eclipse.jgit.revwalk.RevObject;
+import org.eclipse.jgit.revwalk.RevSort;
+import org.eclipse.jgit.revwalk.RevWalk;
 import org.eclipse.jgit.storage.file.FileRepositoryBuilder;
-
-import static javax.swing.text.html.HTML.Tag.HEAD;
 
 /**
  * A basic File Manager. Requires 1.6+ for the Desktop &amp; SwingWorker classes, amongst other
@@ -522,16 +508,16 @@ public class FileManager {
             toolBar.addSeparator();
 
             // 9. create git branch 버튼
-           gitCreateBranchFile = new JButton("Git create branch");
-           gitCreateBranchFile.setMnemonic('B');
-           gitCreateBranchFile.addActionListener(new ActionListener() {
-               public void actionPerformed(ActionEvent ae) {
+            gitCreateBranchFile = new JButton("Git create branch");
+            gitCreateBranchFile.setMnemonic('B');
+            gitCreateBranchFile.addActionListener(new ActionListener() {
+                public void actionPerformed(ActionEvent ae) {
                     gitCreateBranchFile();
-               }
-           });
-           toolBar.add(gitCreateBranchFile);
+                }
+            });
+            toolBar.add(gitCreateBranchFile);
 
-           // 10. git branch manager 팝업창 호출
+            // 10. git branch manager 팝업창 호출
             gitBranchManagerFile = new JButton("Git branch manager");
             gitBranchManagerFile.setMnemonic('B');
             gitBranchManagerFile.addActionListener(new ActionListener() {
@@ -556,11 +542,7 @@ public class FileManager {
             gitCommitHistoryFile.setMnemonic('H');
             gitCommitHistoryFile.addActionListener(new ActionListener() {
                 public void actionPerformed(ActionEvent ae) {
-                    try{
-                        drawGraph();
-                    } catch (IOException | GitAPIException e) {
-                        e.printStackTrace();
-                    }
+                    gitCommitLogGraph();
                 }
             });
             toolBar.add(gitCommitHistoryFile);
@@ -1042,10 +1024,10 @@ public class FileManager {
                     panel.add(commitTablePanel, BorderLayout.NORTH);
                     panel.add(commitMessagePanel, BorderLayout.SOUTH);
 
-                   // 커밋 창 확인 취소 버튼을 "커밋", "취소" 버튼으로 커스터 마이징
+                    // 커밋 창 확인 취소 버튼을 "커밋", "취소" 버튼으로 커스터 마이징
                     Object[] choices = {"커밋", "취소"};
                     Object defaultChoice = choices[0];
-                /*---------------------------------------------------------------------------*/
+                    /*---------------------------------------------------------------------------*/
 
                     if (data.length == 0){ //Stage된 파일이 없을 경우 커밋 창 띄우지 말아야 함
                         showErrorMessage("Stage된 파일이 없습니다.", "No Staged File");
@@ -1421,7 +1403,7 @@ public class FileManager {
 
     /**
      * 단일 파일을 선택 했을 때 해당 파일이 Modified 상태인지 확인해 주는 boolean 함수
-    */
+     */
     private boolean isModifiedFile(File file) {
         try{
             FileRepositoryBuilder builder = new FileRepositoryBuilder();
@@ -1479,7 +1461,7 @@ public class FileManager {
 
     /**
      * git restore 실행로직
-    */
+     */
     private void gitRestoreFile(){ //git restore 실행 로직
         if (currentFile == null || !isFileSelectedInList) { //선택한 파일이 없으면 에러 메시지. List가 아닌 Tree에서 파일을 선택했을 경우도 포함
             showErrorMessage("파일을 선택해주세요.", "Select File");
@@ -1705,7 +1687,18 @@ public class FileManager {
             renameBranchButton.addActionListener(new ActionListener() { // rename branch 버튼 클릭 시
                 @Override
                 public void actionPerformed(ActionEvent e) {
-                    // renameGitBranch();
+                    //선택한 branch 이름을 받는 과정
+                    int selectedRow = table.getSelectedRow(); // 선택된 행의 인덱스
+                    int selectedColumn = table.getSelectedColumn(); // 선택된 열의 인덱스
+
+                    // 선택된 branch가 없는 경우 예외처리
+                    if (selectedRow == -1 || selectedColumn ==-1){
+                        JOptionPane.showMessageDialog(bmFrame, "선택한 branch가 없습니다. branch를 선택하고 다시 시도해주세요", "Branch not selected error", JOptionPane.ERROR_MESSAGE);
+                        return;
+                    }
+                    String selectedBranch = table.getValueAt(selectedRow, 0).toString(); // 선택된 셀의 branch 이름 , 어느곳을 선택해도 branch name 반환
+
+                    renameGitBranch(selectedBranch);
                 }
             });
 
@@ -1718,7 +1711,7 @@ public class FileManager {
 
                     // 선택된 branch가 없는 경우 예외처리
                     if (selectedRow == -1 || selectedColumn ==-1){
-                        JOptionPane.showMessageDialog(bmFrame, "선택한 브랜치가 없습니다. 브랜치를 선택하고 다시 시도해주세요", "Branch not selected error", JOptionPane.ERROR_MESSAGE);
+                        JOptionPane.showMessageDialog(bmFrame, "선택한 branch가 없습니다. branch를 선택하고 다시 시도해주세요", "Branch not selected error", JOptionPane.ERROR_MESSAGE);
                         return;
                     }
                     String selectedBranch = table.getValueAt(selectedRow, 0).toString(); // 선택된 셀의 branch 이름 , 어느곳을 선택해도 branch name 반환
@@ -1733,7 +1726,7 @@ public class FileManager {
                         String headBranch = repository.getBranch();
                         // 현재 head 의 branch 는 삭제할 수 없음
                         if (headBranch.equals(selectedBranch)){
-                            JOptionPane.showMessageDialog(bmFrame,  "현재 Head 브랜치는 삭제할 수 없습니다.", "Current Head chosen error",JOptionPane.ERROR_MESSAGE);
+                            JOptionPane.showMessageDialog(bmFrame,  "현재 Head branch는 삭제할 수 없습니다.", "Current Head chosen error",JOptionPane.ERROR_MESSAGE);
                             return;
                         }
                     }catch (IOException err){
@@ -1741,27 +1734,83 @@ public class FileManager {
                     }
 
                     deleteGitBranch(selectedBranch); // delete 로직수행
-                    bmFrame.dispose();
                 }
             });
 
             mergeBranchButton.addActionListener(new ActionListener() { // merge branch 버튼 클릭 시
                 @Override
                 public void actionPerformed(ActionEvent e) {
-                    // mergeGitBranch();
+                    //선택한 branch 이름을 받는 과정
+                    int selectedRow = table.getSelectedRow(); // 선택된 행의 인덱스
+                    int selectedColumn = table.getSelectedColumn(); // 선택된 열의 인덱스
+
+                    // 선택된 branch가 없는 경우 예외처리
+                    if (selectedRow == -1 || selectedColumn ==-1){
+                        JOptionPane.showMessageDialog(bmFrame, "선택한 branch가 없습니다. Merge할 target branch를 선택하고 다시 시도해주세요", "Branch not selected error", JOptionPane.ERROR_MESSAGE);
+                        return;
+                    }
+                    String selectedBranch = table.getValueAt(selectedRow, 0).toString(); // 선택된 셀의 branch 이름 , 어느곳을 선택해도 branch name 반환
+
+                    //삭제를 하면 안되는 경우들에 대한 얘외처리
+                    FileRepositoryBuilder builder = new FileRepositoryBuilder();
+                    File gitDir = builder.findGitDir(currentFile).getGitDir(); // .git 폴더 찾기
+
+                    try {
+                        Repository repository = builder.setGitDir(gitDir).readEnvironment().findGitDir().build(); // Repository 객체 생성
+                        Ref head = repository.findRef("HEAD");
+                        String headBranch = repository.getBranch();
+                        // 현재 head 의 branch 는 삭제할 수 없음
+                        if (headBranch.equals(selectedBranch)){
+                            JOptionPane.showMessageDialog(bmFrame,  "현재 Head branch와 Merge할 target branch가 같습니다.", "Current Head chosen error",JOptionPane.ERROR_MESSAGE);
+                            return;
+                        }
+                    }catch (IOException err){
+                        err.printStackTrace();
+                    }
+
+                    mergeGitBranch(selectedBranch); // merge 로직수행
                 }
             });
 
             checkoutButton.addActionListener(new ActionListener() { // checkout branch 버튼 클릭 시
                 @Override
                 public void actionPerformed(ActionEvent e) {
-                    // checkoutGitBranch();
+                    //선택한 branch 이름을 받는 과정
+                    int selectedRow = table.getSelectedRow(); // 선택된 행의 인덱스
+                    int selectedColumn = table.getSelectedColumn(); // 선택된 열의 인덱스
+
+                    // 선택된 branch가 없는 경우 예외처리
+                    if (selectedRow == -1 || selectedColumn ==-1){
+                        JOptionPane.showMessageDialog(bmFrame, "선택한 브랜치가 없습니다. 브랜치를 선택하고 다시 시도해주세요", "Branch not selected error", JOptionPane.ERROR_MESSAGE);
+                        return;
+                    }
+                    String selectedBranch = table.getValueAt(selectedRow, 0).toString(); // 선택된 셀의 branch 이름 , 어느곳을 선택해도 branch name 반환
+
+                    FileRepositoryBuilder builder = new FileRepositoryBuilder();
+                    File gitDir = builder.findGitDir(currentFile).getGitDir(); // .git 폴더 찾기
+
+                    try {
+                        Repository repository = builder.setGitDir(gitDir).readEnvironment().findGitDir().build(); // Repository 객체 생성
+                        Ref head = repository.findRef("HEAD");
+                        String headBranch = repository.getBranch();
+                        // 현재 head 의 branch로는 checkout하지 않음.
+                        if(selectedBranch.compareTo(headBranch) == 0){
+                            JOptionPane.showMessageDialog(bmFrame, "이미 " + selectedBranch + "에 있습니다.", "Already in selected Branch", JOptionPane.ERROR_MESSAGE);
+                            return;
+                        }
+                    }catch (IOException err){
+                        err.printStackTrace();
+                    }
+
+                    checkoutGitBranch(selectedBranch);
                 }
             });
 
             // branchmanager 화면에 출력
             bmFrame.add(panel);
-            bmFrame.setVisible(true); bmFrame.setLocationRelativeTo(null); bmFrame.setPreferredSize(new Dimension(700, 450));
+            bmFrame.setVisible(true);
+            bmFrame.setLocationRelativeTo(null);
+            bmFrame.setPreferredSize(new Dimension(700, 300));
             bmFrame.pack();
         } catch (IOException | GitAPIException e) {
             e.printStackTrace();
@@ -1787,11 +1836,61 @@ public class FileManager {
     }
 
     /**
+     * git checkout branch
+     */
+    private void checkoutGitBranch(String branchName){
+        try{
+            String[] gitCheckoutCommand = {"git", "checkout", branchName};
+            ProcessBuilder processBuilder = new ProcessBuilder(gitCheckoutCommand);
+            if(currentFile.isDirectory()){ // 현재 디렉토리 -> 바로 실행
+                processBuilder.directory(currentFile);
+            } else { // 현재 파일 -> 파일의 부모 디렉토리 기준으로 실행
+                processBuilder.directory(currentFile.getParentFile());
+            }
+
+            Process process = processBuilder.start();
+
+            int checkoutStatus = process.waitFor(); // git checkout branch 명령어 정상 실행 여부 판단
+            if (checkoutStatus == 0) { // git checkout branch 명령어가 정상적으로 실행될 경우
+                JOptionPane.showMessageDialog(bmFrame, branchName +" branch로 Checkout하였습니다.");
+                System.out.println("Checkout to selected Branch");
+
+                FileRepositoryBuilder builder = new FileRepositoryBuilder();
+                File gitDir = builder.findGitDir(currentFile).getGitDir(); // .git 폴더 찾기
+
+                try {//전체 gui에서 current branch 명 갱신해주기.
+                    Repository repository = builder.setGitDir(gitDir).readEnvironment().findGitDir().build(); // Repository 객체 생성
+                    if(gitCurrentBranch != null) { // null이 아닐 경우에만 branch명 갱신
+                        gitCurrentBranch.setText("Current Git Branch: " + repository.getBranch()); // branch명 갱신
+                    }
+                }catch (IOException err){
+                    err.printStackTrace();
+                }
+
+                //중앙 탐색기에서 현재 브랜치의 파일들 렌더링해주기.
+                try {
+                    renderGitFileStatus(); //스테이지 했을 경우, 파일에 변화가 일어났으므로 렌더링
+                    TreePath parentPath = findTreePath(currentFile);
+                    DefaultMutableTreeNode parentNode = (DefaultMutableTreeNode) parentPath.getLastPathComponent();
+                    showChildren(parentNode);
+                } catch (IOException | GitAPIException e1) {
+                    e1.printStackTrace();
+                }
+                gui.repaint();
+
+            }else{
+                showErrorMessage("선택한 Branch로 Checkout하는 과정에서 오류가 발생하였습니다.","git checkout branch error");
+            }
+        }
+        catch(IOException | NullPointerException | InterruptedException e){
+            e.printStackTrace();
+        }
+    }
+    /**
      * git branch 삭제 로직
      */
     private void deleteGitBranch(String branchName){
         try{
-
             String[] gitDeleteCommand = {"git", "branch", "-d", branchName};
             ProcessBuilder processBuilder = new ProcessBuilder(gitDeleteCommand);
             if(currentFile.isDirectory()){ // 현재 디렉토리 -> 바로 실행
@@ -1806,6 +1905,8 @@ public class FileManager {
             if (delStatus == 0) { // git branch -d 명령어가 정상적으로 실행될 경우
                 JOptionPane.showMessageDialog(bmFrame, "성공적으로 브랜치를 삭제했습니다.");
                 System.out.println("branch Deleted");
+                bmFrame.dispose();
+                gitBranchManagerFile();
             } else { //git branch -D 명령어가 정상적으로 실행되지 않았을 경우 , 즉 merge되지 않은 branch 인 경우
 
                 //
@@ -1824,6 +1925,8 @@ public class FileManager {
                     int delHardProcess = hardDeleteProcess.waitFor();
 
                     if (delHardProcess ==0){
+                        bmFrame.dispose();
+                        gitBranchManagerFile();
                         JOptionPane.showMessageDialog(bmFrame, "성공적으로 브랜치를 삭제했습니다.");
                     }
 
@@ -1837,6 +1940,144 @@ public class FileManager {
         catch(IOException | NullPointerException | InterruptedException e){
             e.printStackTrace();
         }
+    }
+
+    /**
+     * git branch rename 로직
+     */
+    private void renameGitBranch(String branchName){
+        JPanel rnPanel = new JPanel(new GridLayout(1, 4));
+        JLabel branchname = new JLabel(" new branch name:");
+        branchname.setPreferredSize(new Dimension(50, 20));
+
+        JTextField textField = new JTextField();
+        textField.setPreferredSize(new Dimension(100, 20));
+        rnPanel.add(branchname);
+        rnPanel.add(textField);
+        rnPanel.setPreferredSize(new Dimension(300, 20));
+
+        //동작을 구현할 buttonPanel
+        JButton okButton = new JButton("Ok");
+        JButton cancelButton = new JButton("Cancel");
+        JPanel buttonPanel = new JPanel(new GridLayout());
+        buttonPanel.add(cancelButton);
+        buttonPanel.add(okButton);
+
+        // Panel들을 포함할 Frame
+        JFrame rnFrame = new JFrame("git rename branch");
+        rnFrame.setLayout(new BorderLayout());
+        rnFrame.add(rnPanel, BorderLayout.CENTER);
+        rnFrame.add(buttonPanel, BorderLayout.SOUTH);
+        rnFrame.setVisible(true);
+        rnFrame.pack();
+        rnFrame.setLocationRelativeTo(null);
+
+        // okButton 동작. 공란과 이미 존재하는 브랜치에 대한 검사. 이상없을 시 git branch 명령어 실행
+        okButton.addActionListener(new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                String newBranchName = textField.getText();
+                if (newBranchName.isEmpty()) { // branch명 공란 검사
+                    rnFrame.dispose();
+                    JOptionPane.showMessageDialog(bmFrame,"branch명은 공백이 될 수 없습니다.","git branch -m error",JOptionPane.ERROR_MESSAGE);
+                    return;
+                }
+                if (ifSameNameExistInBranch(newBranchName)) {// 이미 git에 존재하는 branch인지 검사
+                    rnFrame.dispose();
+                    JOptionPane.showMessageDialog(bmFrame,"이미 존재하는 branch명입니다.","git branch -m error",JOptionPane.ERROR_MESSAGE);
+                    return;
+                }
+                try { // git branch -m 명령어 실행
+                    rnFrame.dispose();
+                    String[] gitRnCommand = {"git", "branch", "-m", branchName, newBranchName};
+                    ProcessBuilder processBuilder = new ProcessBuilder(gitRnCommand);
+
+                    if (currentFile.isDirectory()) { // 현재 디렉토리 -> 바로 실행
+                        processBuilder.directory(currentFile);
+                    } else { // 현재 파일 -> 파일의 부모 디렉토리 기준으로 실행
+                        processBuilder.directory(currentFile.getParentFile());
+                    }
+                    Process process = processBuilder.start();
+
+                    int mvStatus = process.waitFor(); // git branch -m 명령어 정상 실행 여부 판단
+                    if (mvStatus == 0) { // git branch -m 명령어가 정상적으로 실행될 경우
+                        JOptionPane.showMessageDialog(bmFrame, "성공적으로 branch 이름을 변경했습니다.");
+                        System.out.println("Old branch name : " + branchName + " new branch name : " + newBranchName);
+                        bmFrame.dispose();
+                        gitBranchManagerFile();
+                    } else { //git branch -m 명령어가 정상적으로 실행되지 않았을 경우
+                        JOptionPane.showMessageDialog(bmFrame, "branch 변경 중 오류가 발생했습니다.", "git branch -m error", JOptionPane.ERROR_MESSAGE);
+                    }
+                } catch (InterruptedException | IOException e2) {
+                    e2.printStackTrace();
+                }
+
+            }
+        });
+
+        cancelButton.addActionListener(new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                rnFrame.dispose();
+            }
+        });
+    }
+
+    /**
+     * git branch merge 로직
+     */
+    private void mergeGitBranch(String branchName){// merge할 상대의 브랜치 이름
+        try{
+            FileRepositoryBuilder builder = new FileRepositoryBuilder();
+            File gitDir = builder.findGitDir(currentFile).getGitDir(); // .git 폴더 찾기
+            Repository repository = builder.setGitDir(gitDir).readEnvironment().findGitDir().build(); // Repository 객체 생성
+            Git git = new Git(repository);
+            String currentBranch = repository.getBranch(); // 현재 브랜치 이름
+            // 먼저 병합 대상 브랜치로 체크아웃
+            Ref mergeTargetBranch = repository.findRef(currentBranch);
+            git.checkout().setName(mergeTargetBranch.getName()).call();
+
+            // 병합을 수행할 브랜치와 병합
+            MergeResult mergeResult = git.merge()
+                    .include(repository.findRef(branchName)) // 병합할 브랜치의 이름 설정
+                    .setStrategy(MergeStrategy.RESOLVE)
+                    .call();
+            if (mergeResult.getConflicts() != null) {// merge 중 conflict 이 난 경우
+                String confiltFilePaths = "다음과 같은 경로에 충돌하는 파일이 발생하므로 Merge를 중단합니다.\n\n";
+                // conflict이 일어난 파일들의 경로를 저장하여 경고 메세지를 띄워줌
+                for (String conflictPath : mergeResult.getConflicts().keySet()) {
+                    System.out.println("Conflict: " + gitDir.getParent()+"/"+conflictPath);
+                    confiltFilePaths += (gitDir.getParent()+"/"+conflictPath+"\n");
+                }
+                JOptionPane.showMessageDialog(bmFrame, confiltFilePaths, "Unmerged Path",JOptionPane.ERROR_MESSAGE);
+
+                //merge 취소하는 과정
+
+                String[] gitMergeAbortCommand = {"git", "merge", "--abort"};
+                ProcessBuilder pBuilder = new ProcessBuilder(gitMergeAbortCommand);
+
+                if(currentFile.isDirectory()){ // 현재 디렉토리 -> 바로 실행
+                    pBuilder.directory(currentFile);
+                } else { // 현재 파일 -> 파일의 부모 디렉토리 기준으로 실행
+                    pBuilder.directory(currentFile.getParentFile());
+                }
+                Process hardDeleteProcess = pBuilder.start();
+                int mergeAbortProcess = hardDeleteProcess.waitFor();
+                if (mergeAbortProcess ==0){ // merge abort 성공적 수행
+                    JOptionPane.showMessageDialog(bmFrame, " Merge를 취소하였습니다.");
+                }
+                else{
+                    JOptionPane.showMessageDialog(bmFrame,  "Merge를 취소하는 중 오류가 발생하였습니다.", "Merge --abort failed",JOptionPane.ERROR_MESSAGE);
+                }
+            } else {
+                // merge가 정상적으로 끝난 경우
+                JOptionPane.showMessageDialog(bmFrame, "성공적으로 브랜치를 병합(merge)했습니다.");
+            }
+
+        } catch (GitAPIException | IOException | InterruptedException e) {
+            e.printStackTrace();
+        }
+
     }
 
     private void gitCommitLogGraph() {
@@ -1855,142 +2096,95 @@ public class FileManager {
             Repository repository = builder.setGitDir(gitDir).readEnvironment().findGitDir().build(); // Repository 객체 생성
             Git git = new Git(repository);
 
-            Graph<String, String> commitGraph = createCommitGraph(repository);
+            Ref currentBranch = repository.exactRef(repository.getFullBranch()); //현재 브랜치의 정보 불러오기
+            String currentBranchName = currentBranch.getName(); //현재 브랜치의 이름 불러오기 (refs/ ...)
 
-            // 그래프 레이아웃 설정
-            StaticLayout<String, String> layout = new StaticLayout<>(commitGraph);
-            layout.setSize(new Dimension(400, 400)); // 그래프 크기 설정
+            Iterable<RevCommit> commits = git.log().add(repository.resolve(currentBranchName)).call(); //현재 브랜치를 기준으로
+            //커밋 오브젝트 불러오기
 
-            // 그래프 렌더링
-            VisualizationViewer<String, String> vv = new VisualizationViewer<>(layout);
-            vv.setPreferredSize(new Dimension(400, 400)); // 컴포넌트 크기 설정
-            vv.getRenderContext().setVertexLabelTransformer(new ToStringLabeller<>());
+            DefaultTableModel tableModel = new DefaultTableModel();
+            tableModel.addColumn("Commit ID");
+            tableModel.addColumn("Commit Message");
 
-            // 그래프를 포함한 프레임 생성
-            JFrame frame = new JFrame("Commit Graph");
-            frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
-            frame.getContentPane().add(vv);
-            frame.pack();
-            frame.setVisible(true);
+            for (RevCommit commit : commits) { //각 커밋 오브젝트들을 불러와 테이블에 표시
+                String commitId = commit.getId().getName();
+                String commitMessage = commit.getShortMessage();
+                Object[] rowData = {commitId, commitMessage};
+                tableModel.addRow(rowData);
+            }
+
+            JTable logTable = new JTable(tableModel); //커밋 오브젝트를 표기하는 테이블
+            JScrollPane scrollPane = new JScrollPane(logTable);
+
+            scrollPane.setPreferredSize(new Dimension(700, 200));
+            JLabel logLabel = new JLabel("Commit log");
+
+            //밑에 커밋 오브젝트들의 정보를 표시하기 위한 별도의 패널
+            JLabel commitIdLabel = new JLabel();
+            JLabel authorLabel = new JLabel();
+            JLabel dateLabel = new JLabel();
+            JLabel messageLabel = new JLabel();
+
+            // 테이블 행 선택 이벤트 리스너
+            logTable.getSelectionModel().addListSelectionListener(new ListSelectionListener() {
+                @Override
+                public void valueChanged(ListSelectionEvent e) {
+                    if (!e.getValueIsAdjusting()) {
+                        int selectedRow = logTable.getSelectedRow(); //현재 선택한 테이블의 행 가져오기
+                        if (selectedRow != -1) {
+                            String commitId = (String) logTable.getValueAt(selectedRow, 0); //테이블의 커밋 오브젝트 ID를 기준으로 커밋의 정보 불러오기
+                            try{
+                                RevCommit commit = git.getRepository().parseCommit(repository.resolve(commitId)); //커밋 오브젝트 ID를 통해 특정 커밋 오브젝트 정보 불러오기
+                                String author = commit.getAuthorIdent().getName(); //작성자
+                                String date = commit.getAuthorIdent().getWhen().toString(); //커밋 날짜
+                                String message = commit.getFullMessage(); //커밋 메시지
+
+                                // 커밋 정보를 표시하는 JLabel 업데이트
+                                commitIdLabel.setText(commitId);
+                                authorLabel.setText(author);
+                                dateLabel.setText(date);
+                                messageLabel.setText(message);
+                            }catch (IOException e1){
+                                e1.printStackTrace();
+                            }
+
+                        }
+                    }
+                }
+            });
+
+            JPanel commitMainInfo = new JPanel(new BorderLayout(4, 2)); //커밋 정보 패널
+            commitMainInfo.setBorder(new EmptyBorder(0, 6, 0, 6));
+
+            JPanel commitLabel = new JPanel(new GridLayout(0, 1, 2, 2)); //왼쪽의 커밋 정보 분류 레이블
+            commitLabel.setForeground(Color.gray);
+            commitMainInfo.add(commitLabel, BorderLayout.WEST);
+
+            JPanel commitDetail = new JPanel(new GridLayout(0, 1, 2, 2)); //오른쪽의 커밋 디테일 레이블
+            commitMainInfo.add(commitDetail, BorderLayout.CENTER);
+
+            commitLabel.add(new JLabel("Commit ID : ", JLabel.TRAILING)); //레이블 텍스트를 오른쪽으로 정렬
+            commitDetail.add(commitIdLabel);
+            commitLabel.add(new JLabel("Author : ", JLabel.TRAILING));
+            commitDetail.add(authorLabel);
+            commitLabel.add(new JLabel("Date : ", JLabel.TRAILING));
+            commitDetail.add(dateLabel);
+            commitLabel.add(new JLabel("Message : ", JLabel.TRAILING));
+            commitDetail.add(messageLabel);
 
 
+
+            JPanel panel = new JPanel(new BorderLayout()); //패널 구성
+            panel.add(logLabel, BorderLayout.NORTH);
+            panel.add(scrollPane, BorderLayout.CENTER);
+            panel.add(commitMainInfo, BorderLayout.SOUTH);
+
+            int optionPane = JOptionPane.showOptionDialog(gui, panel, "Git Commit", JOptionPane.OK_CANCEL_OPTION,JOptionPane.QUESTION_MESSAGE,null,null,JOptionPane.YES_OPTION);
             repository.close();
-
         } catch (IOException | GitAPIException e) {
             e.printStackTrace();
         }
     }
-
-
-    private void drawGraph() throws IOException, GitAPIException {
-        FileRepositoryBuilder builder = new FileRepositoryBuilder();
-        File gitDir = builder.findGitDir(currentFile).getGitDir(); // .git 폴더 찾기
-        Repository repository = builder.setGitDir(gitDir).readEnvironment().findGitDir().build(); // Repository 객체 생성
-        Git git = new Git(repository);
-
-        RevWalk walk = new RevWalk(repository);
-
-        List<Ref> call = git.branchList().call();
-
-
-
-
-
-        Graph<String, String> graph = new DirectedSparseGraph<>();
-        graph.addVertex("A");
-        graph.addVertex("B");
-        graph.addVertex("C");
-        graph.addVertex("D");
-        graph.addVertex("E");
-
-
-        graph.addEdge("AB", "A", "B");
-        graph.addEdge("BC", "B", "C");
-        graph.addEdge("CD", "C", "D");
-        graph.addEdge("BE","B","E");
-        graph.addEdge("DE","D","E");
-
-
-
-// 트리 레이아웃
-        StaticLayout<String, String> layout = new StaticLayout<>(graph);
-
-// 노드 위치 설정
-        layout.setLocation("A", 50, 50);
-        layout.setLocation("B", 50, 100);
-        layout.setLocation("C", 100, 150);
-        layout.setLocation("D", 100, 200);
-        layout.setLocation("E", 50, 250);
-
-// 그래프 시각화
-        BasicVisualizationServer<String, String> vv = new BasicVisualizationServer<>(layout);
-        vv.getRenderContext().setVertexLabelTransformer(new ToStringLabeller());
-        vv.getRenderContext().setEdgeShapeTransformer(EdgeShape.line(graph));
-
-
-
-        JFrame frame = new JFrame();
-        frame.setDefaultCloseOperation(JFrame.DISPOSE_ON_CLOSE);
-        frame.getContentPane().add(vv);
-        frame.pack();
-        frame.setVisible(true);
-
-    }
-
-    public static void drawGitLogGraph(String repoPath) throws IOException, GitAPIException {
-        // Open the Git repository
-        Repository repo = new FileRepositoryBuilder().setGitDir(new File(repoPath)).build();
-        Git git = new Git(repo);
-
-        // Get all the branches in the repository
-        List<Ref> branches = git.branchList().call();
-
-        // Create a new graph
-        DirectedSparseGraph<PlotCommit<PlotLane>, PlotLane> graph = new DirectedSparseGraph<PlotCommit<PlotLane>, PlotLane>();
-
-        // Create a new walk to traverse the Git log
-        PlotWalk revWalk = new PlotWalk(repo);
-
-        // Add all the commits to the graph
-        for (Ref branch : branches) {
-            RevCommit commit = revWalk.parseCommit(branch.getObjectId());
-            PlotCommit<PlotLane> plotCommit = new PlotCommit<PlotLane>(commit);
-            graph.addVertex(plotCommit);
-        }
-
-        // Add all the edges to the graph
-        for (PlotCommit<PlotLane> plotCommit : graph.getVertices()) {
-            RevCommit commit = plotCommit.getCommit();
-            PlotLane lane = plotCommit.getLane();
-            for (RevCommit parent : commit.getParents()) {
-                PlotCommit<PlotLane> plotParent = new PlotCommit<PlotLane>(parent);
-                PlotLane parentLane = plotParent.getLane();
-                graph.addEdge(lane, plotParent, parentLane);
-            }
-        }
-
-        // Create a new layout for the graph
-        FRLayout<PlotCommit<PlotLane>, PlotLane> layout = new FRLayout<PlotCommit<PlotLane>, PlotLane>(graph);
-
-        // Create a new visualization viewer for the graph
-        VisualizationViewer<PlotCommit<PlotLane>, PlotLane> viewer = new VisualizationViewer<PlotCommit<PlotLane>, PlotLane>(layout);
-        viewer.setPreferredSize(new Dimension(800, 600));
-
-        // Display the graph
-        JFrame frame = new JFrame("Git Log Graph");
-        frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
-        frame.getContentPane().add(viewer);
-        frame.pack();
-        frame.setVisible(true);
-
-        // Close the Git repository
-        git.close();
-        repo.close();
-    }
-
-
-
-
 
     private void showErrorMessage(String errorMessage, String errorTitle) {
         JOptionPane.showMessageDialog(gui, errorMessage, errorTitle, JOptionPane.ERROR_MESSAGE);
@@ -2150,6 +2344,8 @@ public class FileManager {
         }
         return created;
     }
+
+    JFrame cloneFrame;
     private void gitCloneFile(){
         /*
         1.git clone 버튼을 누르면 나오는 공통된 창을 만들기.
@@ -2168,7 +2364,7 @@ public class FileManager {
         }//
 
         //clone 버튼 클릭시 띄울 프레임
-        JFrame cloneFrame = new JFrame("git clone(local directory: " + currentFile.getName() + ")");cloneFrame.setLayout(new BorderLayout());
+        cloneFrame = new JFrame("git clone(local directory: " + currentFile.getName() + ")");cloneFrame.setLayout(new BorderLayout());
 
         //public과 private 중 어떤 유형의 레포를 clone할 지 선택하고 유형에 따른 입력값을 달리하기 위한 옵션구현.
         JPanel publicPanel, privatePanel, buttonPanel, jpRadioButtons;
@@ -2260,7 +2456,7 @@ public class FileManager {
     }
     private void gitClonePublic(String RepositoryURL){
         try{
-            int result = JOptionPane.showConfirmDialog(gui, "Public Repository를 Clone하시겠습니까?", "git clone public", JOptionPane.ERROR_MESSAGE);
+            int result = JOptionPane.showConfirmDialog(cloneFrame, "Public Repository를 Clone하시겠습니까?", "git clone public", JOptionPane.ERROR_MESSAGE);
 
             if (result == JOptionPane.OK_OPTION) { // "예" 클릭 시 git clone 명령어 실행
                 String[] gitCloneCommand = {"git", "clone", RepositoryURL};
@@ -2270,7 +2466,7 @@ public class FileManager {
                 int cloneStatus = process.waitFor(); //git clone 명령어 정상 실행 여부
 
                 if (cloneStatus == 0) { // git clone 명령어가 정상적으로 실행되어 status가 0일 경우
-                    JOptionPane.showMessageDialog(gui, "성공적으로 Repository를 clone 했습니다.");
+                    JOptionPane.showMessageDialog(cloneFrame, "성공적으로 Repository를 clone 했습니다.");
                     System.out.println("Cloned");
 
                     TreePath parentPath = findTreePath(currentFile);
@@ -2293,7 +2489,7 @@ public class FileManager {
     }
     private void gitClonePrivate(String RepositoryURL, String id, String token){
         try{
-            int result = JOptionPane.showConfirmDialog(gui, "Private Repository를 Clone하시겠습니까?", "git clone private", JOptionPane.ERROR_MESSAGE);
+            int result = JOptionPane.showConfirmDialog(cloneFrame, "Private Repository를 Clone하시겠습니까?", "git clone private", JOptionPane.ERROR_MESSAGE);
 
             if (result == JOptionPane.OK_OPTION) { // "예" 클릭 시 git clone 명령어 실행
                 String[] gitCloneCommand = {"git", "clone", "https://" + id + ":" + token + "@" + RepositoryURL.substring(8)};
@@ -2303,7 +2499,7 @@ public class FileManager {
                 int cloneStatus = process.waitFor(); //git clone 명령어 정상 실행 여부
 
                 if (cloneStatus == 0) { // git clone 명령어가 정상적으로 실행되어 status가 0일 경우
-                    JOptionPane.showMessageDialog(gui, "성공적으로 Repository를 clone 했습니다.");
+                    JOptionPane.showMessageDialog(cloneFrame, "성공적으로 Repository를 clone 했습니다.");
                     System.out.println("Cloned");
 
                     TreePath parentPath = findTreePath(currentFile);
@@ -2313,6 +2509,7 @@ public class FileManager {
                     showChildren(parentNode);
                 } else { //git clone 명령어가 정상적으로 실행되지 않았을 경우
                     showErrorMessage("파일을 Clone하는 과정에서 오류가 발생했습니다.", "git clone error");
+                    return;
                 }
             }
 
