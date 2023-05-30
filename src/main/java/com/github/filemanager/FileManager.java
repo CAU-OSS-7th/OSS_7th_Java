@@ -54,22 +54,24 @@ import edu.uci.ics.jung.visualization.decorators.ToStringLabeller;
 import edu.uci.ics.jung.visualization.renderers.Renderer;
 import org.apache.commons.io.FileUtils;
 import org.eclipse.jgit.api.Git;
+import org.eclipse.jgit.api.ListBranchCommand;
 import org.eclipse.jgit.api.LogCommand;
 import org.eclipse.jgit.api.Status;
 import org.eclipse.jgit.api.errors.GitAPIException;
 import org.eclipse.jgit.api.errors.NoHeadException;
 import org.eclipse.jgit.errors.IncorrectObjectTypeException;
 import org.eclipse.jgit.errors.MissingObjectException;
+import org.eclipse.jgit.internal.storage.commitgraph.CommitGraph;
+import org.eclipse.jgit.internal.storage.commitgraph.CommitGraphLoader;
 import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.Ref;
 import org.eclipse.jgit.lib.Repository;
 import org.eclipse.jgit.lib.RepositoryBuilder;
-import org.eclipse.jgit.revplot.AbstractPlotRenderer;
-import org.eclipse.jgit.revwalk.RevCommit;
-import org.eclipse.jgit.revwalk.RevObject;
-import org.eclipse.jgit.revwalk.RevSort;
-import org.eclipse.jgit.revwalk.RevWalk;
+import org.eclipse.jgit.revplot.*;
+import org.eclipse.jgit.revwalk.*;
 import org.eclipse.jgit.storage.file.FileRepositoryBuilder;
+
+import static javax.swing.text.html.HTML.Tag.HEAD;
 
 /**
  * A basic File Manager. Requires 1.6+ for the Desktop &amp; SwingWorker classes, amongst other
@@ -554,7 +556,11 @@ public class FileManager {
             gitCommitHistoryFile.setMnemonic('H');
             gitCommitHistoryFile.addActionListener(new ActionListener() {
                 public void actionPerformed(ActionEvent ae) {
-                    drawGraph();
+                    try{
+                        drawGraph();
+                    } catch (IOException | GitAPIException e) {
+                        e.printStackTrace();
+                    }
                 }
             });
             toolBar.add(gitCommitHistoryFile);
@@ -1849,20 +1855,23 @@ public class FileManager {
             Repository repository = builder.setGitDir(gitDir).readEnvironment().findGitDir().build(); // Repository 객체 생성
             Git git = new Git(repository);
 
-            Graph<String, String> graph = new DirectedSparseGraph<>();
-            StaticLayout<String, String> layout = new StaticLayout<>(graph);
+            Graph<String, String> commitGraph = createCommitGraph(repository);
 
-            // 커밋 로그 가져오기
-            Iterable<RevCommit> commits = getCommits(repository);
+            // 그래프 레이아웃 설정
+            StaticLayout<String, String> layout = new StaticLayout<>(commitGraph);
+            layout.setSize(new Dimension(400, 400)); // 그래프 크기 설정
 
-            // 브랜치 정보 가져오기
-            Map<String, ObjectId> branchMap = getBranches(repository);
+            // 그래프 렌더링
+            VisualizationViewer<String, String> vv = new VisualizationViewer<>(layout);
+            vv.setPreferredSize(new Dimension(400, 400)); // 컴포넌트 크기 설정
+            vv.getRenderContext().setVertexLabelTransformer(new ToStringLabeller<>());
 
-            // 커밋 그래프 생성
-            createCommitGraph(graph, layout, commits, branchMap);
-
-            // 그래프 시각화
-            visualizeCommitGraph(graph, layout);
+            // 그래프를 포함한 프레임 생성
+            JFrame frame = new JFrame("Commit Graph");
+            frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
+            frame.getContentPane().add(vv);
+            frame.pack();
+            frame.setVisible(true);
 
 
             repository.close();
@@ -1871,98 +1880,22 @@ public class FileManager {
             e.printStackTrace();
         }
     }
-    private static Iterable<RevCommit> getCommits(Repository repository) throws GitAPIException, IOException {
-        List<RevCommit> commits = new ArrayList<>();
-        try (RevWalk revWalk = new RevWalk(repository)) {
-            RevCommit headCommit = revWalk.parseCommit(repository.resolve("HEAD"));
-            revWalk.markStart(headCommit);
-            for (RevCommit commit : revWalk) {
-                commits.add(commit);
-            }
-        }
-        return commits;
-    }
 
-    private static Map<String, ObjectId> getBranches(Repository repository) throws GitAPIException, IOException {
-        Map<String, ObjectId> branchMap = new HashMap<>();
-        repository.getRefDatabase()
-                .getRefsByPrefix("refs/heads/")
-                .forEach((name) -> branchMap.put(name.toString().substring("refs/heads/".length())6));
-        return branchMap;
-    }
-    private static void createCommitGraph(Graph<String, String> graph, StaticLayout<String, String> layout,
-                                          Iterable<RevCommit> commits, Map<String, ObjectId> branchMap) {
-        Map<ObjectId, String> commitNodeMap = new HashMap<>();
 
-        int x = 50; // 초기 x 좌표
-        int y = 50; // 초기 y 좌표
+    private void drawGraph() throws IOException, GitAPIException {
+        FileRepositoryBuilder builder = new FileRepositoryBuilder();
+        File gitDir = builder.findGitDir(currentFile).getGitDir(); // .git 폴더 찾기
+        Repository repository = builder.setGitDir(gitDir).readEnvironment().findGitDir().build(); // Repository 객체 생성
+        Git git = new Git(repository);
 
-        for (RevCommit commit : commits) {
-            String commitId = commit.getName();
-            graph.addVertex(commitId);
-            commitNodeMap.put(commit.getId(), commitId);
+        RevWalk walk = new RevWalk(repository);
 
-            // 커밋 노드의 위치 설정
-            layout.setLocation(commitId, x, y);
+        List<Ref> call = git.branchList().call();
 
-            // 브랜치 정보 확인
-            for (Map.Entry<String, ObjectId> entry : branchMap.entrySet()) {
-                String branchName = entry.getKey();
-                ObjectId branchObjectId = entry.getValue();
 
-                if (commit.getId().equals(branchObjectId)) {
-                    // 브랜치에 해당하는 커밋인 경우 x 좌표를 50씩 증가시킴
-                    x += 50;
 
-                    // 브랜치와 커밋을 연결하는 엣지 추가
-                    String edgeId = commitId + "_" + branchName;
-                    graph.addEdge(edgeId, branchName, commitId);
 
-                    // 브랜치 노드의 위치 설정
-                    layout.setLocation(branchName, x, y);
-                }
-            }
 
-            // y 좌표를 50 증가시킴
-            y += 50;
-        }
-
-        // 브랜치 간의 merge 관계 표시
-        for (Map.Entry<String, ObjectId> entry : branchMap.entrySet()) {
-            String branchName = entry.getKey();
-            ObjectId branchObjectId = entry.getValue();
-
-            // 브랜치가 merge된 커밋 확인
-            RevCommit mergeCommit = commits.iterator().next();
-            while (mergeCommit != null) {
-                if (mergeCommit.getParentCount() > 1) {
-                    for (RevCommit parent : mergeCommit.getParents()) {
-                        if (parent.getId().equals(branchObjectId)) {
-                            // 브랜치가 merge된 경우
-                            String mergeCommitId = commitNodeMap.get(mergeCommit.getId());
-                            String branchCommitId = commitNodeMap.get(branchObjectId);
-
-                            // merge 대상의 브랜치 커밋에서 merge 커밋으로 화살표가 뻗어나가는 엣지 추가
-                            String edgeId = branchCommitId + "_" + mergeCommitId;
-                            graph.addEdge(edgeId, branchCommitId, mergeCommitId);
-                        }
-                    }
-                }
-                mergeCommit = mergeCommit.getParentCount() > 0 ? mergeCommit.getParent(0) : null;
-            }
-        }
-    }
-    private static void visualizeCommitGraph(Graph<String, String> graph, StaticLayout<String, String> layout) {
-        VisualizationViewer<String, String> vv = new VisualizationViewer<>(layout);
-        vv.setPreferredSize(new Dimension(600, 400));
-        vv.getRenderContext().setVertexLabelTransformer(new ToStringLabeller());
-        vv.getRenderer().getVertexLabelRenderer().setPosition(Renderer.VertexLabel.Position.CNTR);
-
-        // 그래프 시각화
-        // ...
-    }
-
-    private void drawGraph(){
         Graph<String, String> graph = new DirectedSparseGraph<>();
         graph.addVertex("A");
         graph.addVertex("B");
@@ -2002,6 +1935,57 @@ public class FileManager {
         frame.pack();
         frame.setVisible(true);
 
+    }
+
+    public static void drawGitLogGraph(String repoPath) throws IOException, GitAPIException {
+        // Open the Git repository
+        Repository repo = new FileRepositoryBuilder().setGitDir(new File(repoPath)).build();
+        Git git = new Git(repo);
+
+        // Get all the branches in the repository
+        List<Ref> branches = git.branchList().call();
+
+        // Create a new graph
+        DirectedSparseGraph<PlotCommit<PlotLane>, PlotLane> graph = new DirectedSparseGraph<PlotCommit<PlotLane>, PlotLane>();
+
+        // Create a new walk to traverse the Git log
+        PlotWalk revWalk = new PlotWalk(repo);
+
+        // Add all the commits to the graph
+        for (Ref branch : branches) {
+            RevCommit commit = revWalk.parseCommit(branch.getObjectId());
+            PlotCommit<PlotLane> plotCommit = new PlotCommit<PlotLane>(commit);
+            graph.addVertex(plotCommit);
+        }
+
+        // Add all the edges to the graph
+        for (PlotCommit<PlotLane> plotCommit : graph.getVertices()) {
+            RevCommit commit = plotCommit.getCommit();
+            PlotLane lane = plotCommit.getLane();
+            for (RevCommit parent : commit.getParents()) {
+                PlotCommit<PlotLane> plotParent = new PlotCommit<PlotLane>(parent);
+                PlotLane parentLane = plotParent.getLane();
+                graph.addEdge(lane, plotParent, parentLane);
+            }
+        }
+
+        // Create a new layout for the graph
+        FRLayout<PlotCommit<PlotLane>, PlotLane> layout = new FRLayout<PlotCommit<PlotLane>, PlotLane>(graph);
+
+        // Create a new visualization viewer for the graph
+        VisualizationViewer<PlotCommit<PlotLane>, PlotLane> viewer = new VisualizationViewer<PlotCommit<PlotLane>, PlotLane>(layout);
+        viewer.setPreferredSize(new Dimension(800, 600));
+
+        // Display the graph
+        JFrame frame = new JFrame("Git Log Graph");
+        frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
+        frame.getContentPane().add(viewer);
+        frame.pack();
+        frame.setVisible(true);
+
+        // Close the Git repository
+        git.close();
+        repo.close();
     }
 
 
