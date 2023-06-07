@@ -25,7 +25,6 @@ package com.github.filemanager;
 
 import java.awt.*;
 import java.awt.event.*;
-import java.awt.image.*;
 import java.io.*;
 import java.net.URL;
 import java.nio.channels.FileChannel;
@@ -33,31 +32,27 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.*;
 import java.util.List;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import javax.imageio.ImageIO;
 import javax.swing.*;
 import javax.swing.border.*;
 import javax.swing.event.*;
 import javax.swing.filechooser.FileSystemView;
 import javax.swing.table.*;
+import javax.swing.text.*;
 import javax.swing.tree.*;
 
 import org.apache.commons.io.FileUtils;
 import org.eclipse.jgit.api.*;
-import org.eclipse.jgit.api.MergeCommand;
 import org.eclipse.jgit.api.errors.*;
-import org.eclipse.jgit.errors.IncorrectObjectTypeException;
-import org.eclipse.jgit.errors.MissingObjectException;
-import org.eclipse.jgit.lib.ObjectId;
+
 import org.eclipse.jgit.lib.Ref;
 import org.eclipse.jgit.lib.Repository;
-import org.eclipse.jgit.lib.RepositoryBuilder;
 import org.eclipse.jgit.merge.MergeStrategy;
-import org.eclipse.jgit.revplot.AbstractPlotRenderer;
-import org.eclipse.jgit.revwalk.RevCommit;
-import org.eclipse.jgit.revwalk.RevObject;
-import org.eclipse.jgit.revwalk.RevSort;
-import org.eclipse.jgit.revwalk.RevWalk;
+import org.eclipse.jgit.revwalk.*;
 import org.eclipse.jgit.storage.file.FileRepositoryBuilder;
+
 
 /**
  * A basic File Manager. Requires 1.6+ for the Desktop &amp; SwingWorker classes, amongst other
@@ -508,16 +503,16 @@ public class FileManager {
             toolBar.addSeparator();
 
             // 9. create git branch 버튼
-           gitCreateBranchFile = new JButton("Git create branch");
-           gitCreateBranchFile.setMnemonic('B');
-           gitCreateBranchFile.addActionListener(new ActionListener() {
-               public void actionPerformed(ActionEvent ae) {
+            gitCreateBranchFile = new JButton("Git create branch");
+            gitCreateBranchFile.setMnemonic('B');
+            gitCreateBranchFile.addActionListener(new ActionListener() {
+                public void actionPerformed(ActionEvent ae) {
                     gitCreateBranchFile();
-               }
-           });
-           toolBar.add(gitCreateBranchFile);
+                }
+            });
+            toolBar.add(gitCreateBranchFile);
 
-           // 10. git branch manager 팝업창 호출
+            // 10. git branch manager 팝업창 호출
             gitBranchManagerFile = new JButton("Git branch manager");
             gitBranchManagerFile.setMnemonic('B');
             gitBranchManagerFile.addActionListener(new ActionListener() {
@@ -1024,10 +1019,10 @@ public class FileManager {
                     panel.add(commitTablePanel, BorderLayout.NORTH);
                     panel.add(commitMessagePanel, BorderLayout.SOUTH);
 
-                   // 커밋 창 확인 취소 버튼을 "커밋", "취소" 버튼으로 커스터 마이징
+                    // 커밋 창 확인 취소 버튼을 "커밋", "취소" 버튼으로 커스터 마이징
                     Object[] choices = {"커밋", "취소"};
                     Object defaultChoice = choices[0];
-                /*---------------------------------------------------------------------------*/
+                    /*---------------------------------------------------------------------------*/
 
                     if (data.length == 0){ //Stage된 파일이 없을 경우 커밋 창 띄우지 말아야 함
                         showErrorMessage("Stage된 파일이 없습니다.", "No Staged File");
@@ -1403,7 +1398,7 @@ public class FileManager {
 
     /**
      * 단일 파일을 선택 했을 때 해당 파일이 Modified 상태인지 확인해 주는 boolean 함수
-    */
+     */
     private boolean isModifiedFile(File file) {
         try{
             FileRepositoryBuilder builder = new FileRepositoryBuilder();
@@ -1461,7 +1456,7 @@ public class FileManager {
 
     /**
      * git restore 실행로직
-    */
+     */
     private void gitRestoreFile(){ //git restore 실행 로직
         if (currentFile == null || !isFileSelectedInList) { //선택한 파일이 없으면 에러 메시지. List가 아닌 Tree에서 파일을 선택했을 경우도 포함
             showErrorMessage("파일을 선택해주세요.", "Select File");
@@ -2080,6 +2075,10 @@ public class FileManager {
 
     }
 
+    /**
+     * git log --graph 명령어를 통한 그래프 좌측 출력 및 테이블의 행을 그래프의 위치에 맞게 조정하여 커밋 테이블을 구현
+     */
+
     private void gitCommitLogGraph() {
         if (currentFile == null) { // 파일 선택되지 않았을 때 에러
             showErrorMessage("No location selected for new file.", "Select Location");
@@ -2096,54 +2095,90 @@ public class FileManager {
             Repository repository = builder.setGitDir(gitDir).readEnvironment().findGitDir().build(); // Repository 객체 생성
             Git git = new Git(repository);
 
-            Ref currentBranch = repository.exactRef(repository.getFullBranch()); //현재 브랜치의 정보 불러오기
-            String currentBranchName = currentBranch.getName(); //현재 브랜치의 이름 불러오기 (refs/ ...)
 
-            Iterable<RevCommit> commits = git.log().add(repository.resolve(currentBranchName)).call(); //현재 브랜치를 기준으로
-            //커밋 오브젝트 불러오기
+            DefaultTableModel tableModel = new DefaultTableModel(){ //테이블을 수정하지 못하도록 방지
+                public boolean isCellEditable(int row, int column) {
+                    // 모든 셀을 편집 불가능하도록 설정
+                    return false;
+                }
+            };
 
-            DefaultTableModel tableModel = new DefaultTableModel();
+            // 테이블의 열을 커밋 ID와 커밋 메시지로 초기화
             tableModel.addColumn("Commit ID");
             tableModel.addColumn("Commit Message");
 
-            for (RevCommit commit : commits) { //각 커밋 오브젝트들을 불러와 테이블에 표시
-                String commitId = commit.getId().getName();
-                String commitMessage = commit.getShortMessage();
-                Object[] rowData = {commitId, commitMessage};
-                tableModel.addRow(rowData);
-            }
+
+            //--------------------UI 구성----------------------
+            JPanel labelPanel = new JPanel(new GridLayout(1,2));
+            JPanel fieldPanel = new JPanel(new BorderLayout(0,0));
+            JPanel commitInfoPanel = new JPanel(new BorderLayout(4,2));
+
+            JPanel mainPanel = new JPanel(new BorderLayout());
+
+            //-----Label 패널--------------
+            JLabel logLabel = new JLabel("Commit Graph (Current Branch : " + repository.getBranch() + ")");
+            labelPanel.add(logLabel);
+
+
+            //-----Graph, Table 패널---------
+            JTextArea graphField = new JTextArea();
+            graphField.setEditable(false);
+            JScrollPane graphScrollPane = new JScrollPane(graphField);
+            graphScrollPane.setPreferredSize(new Dimension(100,300));
 
             JTable logTable = new JTable(tableModel); //커밋 오브젝트를 표기하는 테이블
-            JScrollPane scrollPane = new JScrollPane(logTable);
+            JScrollPane tableScrollPane = new JScrollPane(logTable);
+            tableScrollPane.setPreferredSize(new Dimension(700, 300));
 
-            scrollPane.setPreferredSize(new Dimension(700, 200));
-            JLabel logLabel = new JLabel("Commit log");
+            fieldPanel.add(graphScrollPane, BorderLayout.WEST);
+            fieldPanel.add(tableScrollPane, BorderLayout.CENTER);
 
-            //밑에 커밋 오브젝트들의 정보를 표시하기 위한 별도의 패널
+
+            //--------Commit Info 패널-------
             JLabel commitIdLabel = new JLabel();
             JLabel authorLabel = new JLabel();
             JLabel dateLabel = new JLabel();
             JLabel messageLabel = new JLabel();
+            JButton commitDiffButton = new JButton("Show Diff");
+            commitDiffButton.setSize(new Dimension(100,50));
+            commitDiffButton.setVisible(false);
 
-            // 테이블 행 선택 이벤트 리스너
+            //
             logTable.getSelectionModel().addListSelectionListener(new ListSelectionListener() {
                 @Override
                 public void valueChanged(ListSelectionEvent e) {
                     if (!e.getValueIsAdjusting()) {
                         int selectedRow = logTable.getSelectedRow(); //현재 선택한 테이블의 행 가져오기
                         if (selectedRow != -1) {
-                            String commitId = (String) logTable.getValueAt(selectedRow, 0); //테이블의 커밋 오브젝트 ID를 기준으로 커밋의 정보 불러오기
+                            String commitId = null;
+                            for (int i =0 ; i < logTable.getColumnCount(); i++){
+                                commitId = (String) logTable.getValueAt(selectedRow, i); //테이블의 커밋 오브젝트 ID를 기준으로 커밋의 정보 불러오기
+                                if (commitId != null){
+                                    break;
+                                }
+                            }
+                            System.out.println(commitId);
                             try{
-                                RevCommit commit = git.getRepository().parseCommit(repository.resolve(commitId)); //커밋 오브젝트 ID를 통해 특정 커밋 오브젝트 정보 불러오기
-                                String author = commit.getAuthorIdent().getName(); //작성자
-                                String date = commit.getAuthorIdent().getWhen().toString(); //커밋 날짜
-                                String message = commit.getFullMessage(); //커밋 메시지
+                                if (commitId != null){
+                                    RevCommit commit = git.getRepository().parseCommit(repository.resolve(commitId)); //커밋 오브젝트 ID를 통해 특정 커밋 오브젝트 정보 불러오기
+                                    String author = commit.getAuthorIdent().getName(); //작성자
+                                    String date = commit.getAuthorIdent().getWhen().toString(); //커밋 날짜
+                                    String message = commit.getFullMessage(); //커밋 메시지
 
-                                // 커밋 정보를 표시하는 JLabel 업데이트
-                                commitIdLabel.setText(commitId);
-                                authorLabel.setText(author);
-                                dateLabel.setText(date);
-                                messageLabel.setText(message);
+                                    // 커밋 정보를 표시하는 JLabel 업데이트
+                                    commitIdLabel.setText(commitId);
+                                    authorLabel.setText(author);
+                                    dateLabel.setText(date);
+                                    messageLabel.setText(message);
+                                    commitDiffButton.setVisible(true);
+                                }else{
+                                    commitIdLabel.setText(" ");
+                                    authorLabel.setText(" ");
+                                    dateLabel.setText(" ");
+                                    messageLabel.setText(" ");
+                                    commitDiffButton.setVisible(false);
+                                }
+
                             }catch (IOException e1){
                                 e1.printStackTrace();
                             }
@@ -2153,15 +2188,14 @@ public class FileManager {
                 }
             });
 
-            JPanel commitMainInfo = new JPanel(new BorderLayout(4, 2)); //커밋 정보 패널
-            commitMainInfo.setBorder(new EmptyBorder(0, 6, 0, 6));
+            commitInfoPanel.setBorder(new EmptyBorder(0, 6, 0, 6));
 
             JPanel commitLabel = new JPanel(new GridLayout(0, 1, 2, 2)); //왼쪽의 커밋 정보 분류 레이블
             commitLabel.setForeground(Color.gray);
-            commitMainInfo.add(commitLabel, BorderLayout.WEST);
+            commitInfoPanel.add(commitLabel, BorderLayout.WEST);
 
             JPanel commitDetail = new JPanel(new GridLayout(0, 1, 2, 2)); //오른쪽의 커밋 디테일 레이블
-            commitMainInfo.add(commitDetail, BorderLayout.CENTER);
+            commitInfoPanel.add(commitDetail, BorderLayout.CENTER);
 
             commitLabel.add(new JLabel("Commit ID : ", JLabel.TRAILING)); //레이블 텍스트를 오른쪽으로 정렬
             commitDetail.add(commitIdLabel);
@@ -2172,19 +2206,247 @@ public class FileManager {
             commitLabel.add(new JLabel("Message : ", JLabel.TRAILING));
             commitDetail.add(messageLabel);
 
+            commitLabel.add(new JLabel("Commit Diff : ", JLabel.TRAILING));
+            commitDetail.add(commitDiffButton);
+
+            commitDiffButton.addActionListener(new ActionListener() {//public 입력창으로 변환.
+                @Override
+                public void actionPerformed(ActionEvent e) {
+                    String selectedID = (String) logTable.getValueAt(logTable.getSelectedRow(), 0);
+                    if (selectedID != null){
+                        showCommitDiff(selectedID);
+                    }
+                }
+            });
 
 
-            JPanel panel = new JPanel(new BorderLayout()); //패널 구성
-            panel.add(logLabel, BorderLayout.NORTH);
-            panel.add(scrollPane, BorderLayout.CENTER);
-            panel.add(commitMainInfo, BorderLayout.SOUTH);
+            //메인 패널 구성
+            mainPanel.add(labelPanel, BorderLayout.NORTH);
+            mainPanel.add(fieldPanel, BorderLayout.CENTER);
+            mainPanel.add(commitInfoPanel, BorderLayout.SOUTH);
 
-            int optionPane = JOptionPane.showOptionDialog(gui, panel, "Git Commit", JOptionPane.OK_CANCEL_OPTION,JOptionPane.QUESTION_MESSAGE,null,null,JOptionPane.YES_OPTION);
+            //그래프와 테이블의 위치가 정확히 일치하도록 하기 위해 폰트 크기 채정
+            logTable.setFont(new Font("Serif", Font.PLAIN, 11));
+            graphField.setFont(new Font("Serif", Font.BOLD, 13));
+
+            //-------------------------UI 구성 끝-----------------------
+
+            JScrollBar graphScrollbar = graphScrollPane.getVerticalScrollBar();
+            JScrollBar tableScrollbar = tableScrollPane.getVerticalScrollBar();
+
+            // 그래프와 테이블이 동시에 같이 스크롤이 되도록 리스너의 수정을 통해 스크롤바가 같은 위치를 가리키도록 설정
+            AdjustmentListener adjustmentListener = new AdjustmentListener() {
+                @Override
+                public void adjustmentValueChanged(AdjustmentEvent e) {
+                    int value = e.getValue();
+                    tableScrollbar.setValue(value);
+                }
+            };
+
+            AdjustmentListener graphAdjustmentListener = new AdjustmentListener() {
+                @Override
+                public void adjustmentValueChanged(AdjustmentEvent e) {
+                    int value = e.getValue();
+                    graphScrollbar.setValue(value);
+                }
+            };
+
+            //그래프 필드와 테이블 필드에 커스텀 리스너 추가
+            graphScrollbar.addAdjustmentListener(adjustmentListener);
+            tableScrollbar.addAdjustmentListener(graphAdjustmentListener);
+
+            //좌측 그래프의 "*" 부분의 위치에 정확히 커밋 오브젝트가 같은 테이블 위치에 표시되도록 하기 위한 Boolean 리스트
+            //Checksum이 있다는 것은 그 줄이 커밋 오브젝트가 있다는 의미고, 없다는 것은 그래프의 가지라느 의미
+            List<Boolean> syncTableWithGraph= new ArrayList<>();
+
+            //ProcessBuilder를 통해 git log 파싱 후 JTextArea에 출력
+            parseGraphLog(graphField, syncTableWithGraph);
+            //커밋 테이블에 커밋 오브젝트 출력. 위치는 그래프의 커밋 오브젝트 출력 지점과 동일하도록 수정
+            drawCommitTable(git, tableModel, syncTableWithGraph);
+
+            SwingUtilities.invokeLater(() -> {
+                graphScrollPane.getVerticalScrollBar().setValue(0);
+                tableScrollPane.getVerticalScrollBar().setValue(0);
+            }
+            );
+
+            //그래프의 수직 스크롤을 없앰으로써 가시성 추가
+            graphScrollPane.setVerticalScrollBarPolicy(JScrollPane.VERTICAL_SCROLLBAR_NEVER);
+
+            int optionPane = JOptionPane.showOptionDialog(gui, mainPanel, "Git Commit", JOptionPane.OK_CANCEL_OPTION,JOptionPane.QUESTION_MESSAGE,null,null,JOptionPane.YES_OPTION);
             repository.close();
-        } catch (IOException | GitAPIException e) {
+        } catch (IOException e) {
             e.printStackTrace();
         }
     }
+
+    /**
+     * ProcessBuilder를 통해 그래프 출력을 파싱하여 JTextArea에 출력되도록 설정
+     * @param textArea
+     * @param syncTableWithGraph
+     */
+    private void parseGraphLog(JTextArea textArea, List<Boolean> syncTableWithGraph){
+        try {
+            ProcessBuilder processBuilder = new ProcessBuilder("git", "log", "--graph", "--pretty=oneline");
+            if (currentFile.isFile()){ //파일일 경우 오류 발생하므로 부모 디렉토리에서 실행되도록 수정
+                processBuilder.directory(new File(currentFile.getParentFile().getAbsolutePath()));
+            }else{
+                processBuilder.directory(new File(currentFile.getAbsolutePath()));
+            }
+            Process process = processBuilder.start();
+
+            // Read the output of the command
+            BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream()));
+            String line;
+            StringBuilder output = new StringBuilder();
+            output.append("\n");
+
+            //알파벳이 있는 Checksum을 인식하기 위한 Pattern Matcher 선언
+            Pattern pattern = Pattern.compile("[a-zA-Z]");
+            Matcher matcher;
+            boolean containsAlphabet;
+
+            while ((line = reader.readLine()) != null) {
+                if(pattern.matcher(line).find()){ //알파벳이 인식된다는 것은 Checksum이 있다는 의미로, 리스트에 True 저장
+                    syncTableWithGraph.add(true);
+                }else{ //없다는 것은 Checksum이 없다는 의미로, 리스트에 False 저장. 이를 통해 테이블은 빈 행이 표시된다.
+                    syncTableWithGraph.add(false);
+                }
+
+                StringBuilder trimBuilder = new StringBuilder();
+
+                for (char c : line.toCharArray()) {
+                    if (!Character.isLetterOrDigit(c)) { //그래프의 모양만 출력되도록, Checksum 이후의 부분은 모조리 잘라내기
+                        trimBuilder.append(c);
+                    } else {
+                        break;
+                    }
+                }
+
+                output.append(trimBuilder); //Text Area에 추가
+                output.append("\n");
+            }
+
+            // Set the output to the JTextArea
+            textArea.setText(output.toString());
+
+            // Close the reader and wait for the process to finish
+            reader.close();
+            process.waitFor();
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+
+    private void showCommitDiff(String commitID){
+        JTextPane textArea = new JTextPane();
+
+        // JTextArea 스크롤 가능하도록 JScrollPane 생성 및 설정
+        JScrollPane scrollPane = new JScrollPane(textArea);
+        JLabel titleLabel = new JLabel("Commit Diff (" + commitID + ")");
+        scrollPane.setPreferredSize(new Dimension(700,400));
+
+        JPanel panel = new JPanel(new BorderLayout());
+        panel.add(titleLabel, BorderLayout.NORTH);
+        panel.add(scrollPane, BorderLayout.SOUTH);
+
+        parseCommitDiff(textArea, commitID);
+
+        SwingUtilities.invokeLater(() -> {
+                    scrollPane.getVerticalScrollBar().setValue(0);
+                }
+        );
+
+        int optionPane = JOptionPane.showOptionDialog(gui, panel, "Git Commit Diff", JOptionPane.OK_CANCEL_OPTION,JOptionPane.QUESTION_MESSAGE,null,null,JOptionPane.YES_OPTION);
+
+    }
+
+    private void parseCommitDiff(JTextPane textArea, String commitID){
+        try{
+            ProcessBuilder processBuilder = new ProcessBuilder("git", "diff", commitID); //git diff commitID
+            //를 통해 해당 커밋의 내용 불러오기
+            if (currentFile.isFile()){ //파일일 경우 오류 발생하므로 부모 디렉토리에서 실행되도록 수정
+                processBuilder.directory(new File(currentFile.getParentFile().getAbsolutePath()));
+            }else{
+                processBuilder.directory(new File(currentFile.getAbsolutePath()));
+            }
+            Process process = processBuilder.start();
+
+            BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream()));
+            String line;
+
+            while ((line = reader.readLine()) != null) {
+                if (line.startsWith("+")){ //추가한 내용은 초록색
+                    appendToPane(textArea, line+"\n", new Color(0,153,76));
+                }else if (line.startsWith("-")){ //제거한 내용은 빨간색
+                    appendToPane(textArea, line+"\n", Color.red);
+                }else { //그 외는 검은색
+                    appendToPane(textArea, line+"\n", Color.black);
+
+                }
+            }
+
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
+    private void appendToPane(JTextPane tp, String msg, Color c)
+    {
+        StyleContext sc = StyleContext.getDefaultStyleContext();
+        AttributeSet aset = sc.addAttribute(SimpleAttributeSet.EMPTY, StyleConstants.Foreground, c);
+
+        aset = sc.addAttribute(aset, StyleConstants.FontFamily, "Lucida Console");
+        aset = sc.addAttribute(aset, StyleConstants.Alignment, StyleConstants.ALIGN_JUSTIFIED);
+
+        int len = tp.getDocument().getLength();
+        tp.setCaretPosition(len);
+        tp.setCharacterAttributes(aset, false);
+        tp.replaceSelection(msg);
+    }
+
+    /**
+     * 커밋 테이블을 채우기 위한 함수. 그래프의 커밋 오브젝트 출력 지점과 일치하도록 하기 위해, 커밋 오브젝트가 없는 지점은 빈 행으로 표시
+     * @param git
+     * @param tableModel
+     * @param syncTableWithGraph
+     */
+    private void drawCommitTable(Git git, DefaultTableModel tableModel, List<Boolean> syncTableWithGraph){
+        try{
+            Iterable<RevCommit> commits = git.log().call();
+            int i = 0;
+
+            for (RevCommit commit : commits) {
+                Object[] rowData = new Object[tableModel.getColumnCount()];
+
+                String commitId = commit.getId().getName();
+                String commitMessage = commit.getShortMessage();
+                if(!syncTableWithGraph.get(i)){ //해당 줄에 커밋 오브젝트가 없으면 빈 행으로 출력
+                    while(!syncTableWithGraph.get(i)){
+                        rowData[0] = null;
+                        rowData[1] = null;
+                        tableModel.addRow(rowData);
+                        i++;
+                    }
+                }
+                rowData[0] = commitId;
+                rowData[1] = commitMessage;
+                i++;
+
+                tableModel.addRow(rowData);
+
+            }
+
+        }catch (GitAPIException e){
+            e.printStackTrace();
+        }
+    }
+
+// Java에는 그래프 API가 그나마 명령어가 간단한 것이 JUNG API 인데, 처음에 이를 통해 구현하다가 제대로 출력이 되지 않고, 심지어 JScrollPane이
+// 그래프를 인식하지 못하는 상황이 발생해 그래프가 계속 잘리는 문제가 생겨 완전한 그래프 시각화는 불가능하다고 판단했다.
+// GraphQL, JavaFX까지도 고려해봤는데, 우리가 원하는 노드 그래프는 지원하지 않았으며, JGit과 호환성이 매우 떨어져 구현이 매우 힘들었다.
+// 이에 타협점을 고려, Process Builder를 통해 그래프 명령어로 그래프 모양을 출력하고, JTable에서 위치를 그래프 모양과 일치하도록 하여
+// 어느정도 시각화 및 정보 출력이 가능하도록 했다.
+// Checksum 이 존재하지 않으면 graph의 edge부분이라고 판단하여 테이블에는 빈행으로 표시되도록 하여 커밋 오브젝트가 나타나는 지점이 정확히 일치하도록 하였다.
 
     private void showErrorMessage(String errorMessage, String errorTitle) {
         JOptionPane.showMessageDialog(gui, errorMessage, errorTitle, JOptionPane.ERROR_MESSAGE);
@@ -2230,6 +2492,7 @@ public class FileManager {
             }
         });
     }
+
 
     private void setColumnWidth(int column, int width) {
         TableColumn tableColumn = table.getColumnModel().getColumn(column);
