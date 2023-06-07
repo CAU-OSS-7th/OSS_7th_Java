@@ -41,12 +41,10 @@ import javax.swing.border.*;
 import javax.swing.event.*;
 import javax.swing.filechooser.FileSystemView;
 import javax.swing.table.*;
-import javax.swing.text.AbstractDocument;
-import javax.swing.text.AttributeSet;
-import javax.swing.text.BadLocationException;
-import javax.swing.text.DocumentFilter;
+import javax.swing.text.*;
 import javax.swing.tree.*;
 
+import com.google.common.base.StandardSystemProperty;
 import org.apache.commons.io.FileUtils;
 import org.eclipse.jgit.api.*;
 import org.eclipse.jgit.api.MergeCommand;
@@ -2352,12 +2350,12 @@ public class FileManager {
     }
 
     private void showCommitDiff(String commitID){
-        JTextArea textArea = new JTextArea();
+        JTextPane textArea = new JTextPane();
 
         // JTextArea 스크롤 가능하도록 JScrollPane 생성 및 설정
         JScrollPane scrollPane = new JScrollPane(textArea);
         JLabel titleLabel = new JLabel("Commit Diff (" + commitID + ")");
-        scrollPane.setPreferredSize(new Dimension(450,350));
+        scrollPane.setPreferredSize(new Dimension(700,400));
 
         JPanel panel = new JPanel(new BorderLayout());
         panel.add(titleLabel, BorderLayout.NORTH);
@@ -2374,7 +2372,7 @@ public class FileManager {
 
     }
 
-    private void parseCommitDiff(JTextArea textArea, String commitID){
+    private void parseCommitDiff(JTextPane textArea, String commitID){
         try{
             ProcessBuilder processBuilder = new ProcessBuilder("git", "diff", commitID);
             if (currentFile.isFile()){ //파일일 경우 오류 발생하므로 부모 디렉토리에서 실행되도록 수정
@@ -2386,18 +2384,34 @@ public class FileManager {
 
             BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream()));
             String line;
-            StringBuilder output = new StringBuilder();
-            output.append("\n");
 
             while ((line = reader.readLine()) != null) {
-                    output.append(line);
-                    output.append("\n");
+                if (line.startsWith("+")){
+                    appendToPane(textArea, line+"\n", new Color(0,153,76));
+                }else if (line.startsWith("-")){
+                    appendToPane(textArea, line+"\n", Color.red);
+                }else {
+                    appendToPane(textArea, line+"\n", Color.black);
+
+                }
             }
 
-            textArea.setText(output.toString());
         } catch (IOException e) {
             e.printStackTrace();
         }
+    }
+    private void appendToPane(JTextPane tp, String msg, Color c)
+    {
+        StyleContext sc = StyleContext.getDefaultStyleContext();
+        AttributeSet aset = sc.addAttribute(SimpleAttributeSet.EMPTY, StyleConstants.Foreground, c);
+
+        aset = sc.addAttribute(aset, StyleConstants.FontFamily, "Lucida Console");
+        aset = sc.addAttribute(aset, StyleConstants.Alignment, StyleConstants.ALIGN_JUSTIFIED);
+
+        int len = tp.getDocument().getLength();
+        tp.setCaretPosition(len);
+        tp.setCharacterAttributes(aset, false);
+        tp.replaceSelection(msg);
     }
 
     /**
