@@ -94,7 +94,8 @@ You can watch your commit graph by "Git commit history" button. (git log)
 
 if you click a commit, you can confirm its information.
 
+<img width="928" alt="image" src="https://github.com/CAU-OSS-7th/OSS_7th_Java/assets/53044069/78284f68-e61a-479b-a177-e792006f2308">
 
-You can also find difference between the commit and previous commit by "Show Diff" button.
+You can also find difference between the commit and its parent commit by "Show Diff" button.
 
 We always welcome contribution :)
