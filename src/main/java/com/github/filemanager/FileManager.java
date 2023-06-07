@@ -2089,6 +2089,9 @@ public class FileManager {
 
     }
 
+    /**
+     * git log --graph 명령어를 통한 그래프 좌측 출력 및 테이블의 행을 그래프의 위치에 맞게 조정하여 커밋 테이블을 구현
+     */
     private void gitCommitLogGraph() {
         if (currentFile == null) { // 파일 선택되지 않았을 때 에러
             showErrorMessage("No location selected for new file.", "Select Location");
@@ -2265,7 +2268,11 @@ public class FileManager {
     private void parseGraphLog(JTextArea textArea, List<Boolean> syncTableWithGraph){
         try {
             ProcessBuilder processBuilder = new ProcessBuilder("git", "log", "--graph", "--pretty=oneline");
-            processBuilder.directory(new File(currentFile.getAbsolutePath()));
+            if (currentFile.isFile()){
+                processBuilder.directory(new File(currentFile.getParentFile().getAbsolutePath()));
+            }else{
+                processBuilder.directory(new File(currentFile.getAbsolutePath()));
+            }
             Process process = processBuilder.start();
 
             // Read the output of the command
