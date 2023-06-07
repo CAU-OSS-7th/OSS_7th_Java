@@ -54,8 +54,13 @@ import org.eclipse.jgit.lib.Repository;
 import org.eclipse.jgit.lib.RepositoryBuilder;
 import org.eclipse.jgit.merge.MergeStrategy;
 import org.eclipse.jgit.revplot.AbstractPlotRenderer;
+import org.eclipse.jgit.revplot.PlotCommitList;
+import org.eclipse.jgit.revplot.PlotLane;
+import org.eclipse.jgit.revplot.PlotWalk;
 import org.eclipse.jgit.revwalk.*;
 import org.eclipse.jgit.storage.file.FileRepositoryBuilder;
+
+import static org.eclipse.jgit.lib.Constants.HEAD;
 
 /**
  * A basic File Manager. Requires 1.6+ for the Desktop &amp; SwingWorker classes, amongst other
@@ -2096,8 +2101,6 @@ public class FileManager {
 
 
             DefaultTableModel tableModel = new DefaultTableModel();
-            tableModel.addColumn("Commit");
-
             List<Ref> branches = git.branchList().call();
 
             // Add branch columns to the table
@@ -2106,18 +2109,17 @@ public class FileManager {
                 tableModel.addColumn(branchColumnName);
             }
 
+
             // Get branch head commit for the specified branch
 
-            RevCommit branchHead = getBranchHeadCommit(git, repository.getBranch());
             JTable logTable = new JTable(tableModel); //커밋 오브젝트를 표기하는 테이블
 
+            List <String> branchParent = new ArrayList<>();
 
-            if (branchHead != null) {
-                // Traverse commit history starting from the branch head commit
-                traverseCommitHistory(repository,branchHead, tableModel, logTable);
-            } else {
-                System.out.println("Branch not found.");
-            }
+            drawCommitTable(repository, tableModel);
+
+
+
 
             JScrollPane scrollPane = new JScrollPane(logTable);
 
@@ -2137,7 +2139,14 @@ public class FileManager {
                     if (!e.getValueIsAdjusting()) {
                         int selectedRow = logTable.getSelectedRow(); //현재 선택한 테이블의 행 가져오기
                         if (selectedRow != -1) {
-                            String commitId = (String) logTable.getValueAt(selectedRow, 0); //테이블의 커밋 오브젝트 ID를 기준으로 커밋의 정보 불러오기
+                            String commitId = null;
+                            for (int i =0 ; i < logTable.getColumnCount(); i++){
+                                commitId = (String) logTable.getValueAt(selectedRow, i); //테이블의 커밋 오브젝트 ID를 기준으로 커밋의 정보 불러오기
+                                if (commitId != null){
+                                    break;
+                                }
+                            }
+                            System.out.println(commitId);
                             try{
                                 RevCommit commit = git.getRepository().parseCommit(repository.resolve(commitId)); //커밋 오브젝트 ID를 통해 특정 커밋 오브젝트 정보 불러오기
                                 String author = commit.getAuthorIdent().getName(); //작성자
@@ -2191,71 +2200,82 @@ public class FileManager {
         }
     }
 
-    private RevCommit getBranchHeadCommit(Git git, String branchName) throws GitAPIException, IOException {
-        Iterable<RevCommit> commits = git.log().add(git.getRepository().resolve(branchName)).call();
-        for (RevCommit commit : commits) {
-            return commit;
-        }
-        return null;
-    }
-
-    private void traverseCommitHistory(Repository repository, RevCommit commit, DefaultTableModel tableModel, JTable commitTable) throws GitAPIException {
-        // Add commit row to the table
-        tableModel.addRow(getCommitRow(commit, repository, commitTable));
-
-        // Get parent commits
-        RevCommit[] parents = commit.getParents();
-        for (RevCommit parent : parents) {
-            // Traverse parent commits recursively
-            traverseCommitHistory(repository, parent, tableModel, commitTable);
-        }
-    }
-
-    private Object[] getCommitRow(RevCommit commit, Repository repository, JTable commitTable) throws GitAPIException {
-        // Create a new row for the commit
-        Object[] row = new Object[commitTable.getColumnCount()];
+    private void drawCommitTable(Repository repository, DefaultTableModel tableModel) throws GitAPIException, IOException {
         Git git = new Git(repository);
+
         List<Ref> branches = git.branchList().call();
 
-        // Set commit ID in the first column
-        row[0] = commit.getName();
+        Iterable<RevCommit> commits = git.log().all().call();
+        ArrayList<RevCommit>[] branchCommits = new ArrayList[branches.size()];
+        for (int i =0 ;i < branches.size(); i++){
+            branchCommits[i] = new ArrayList<RevCommit>();
+        }
 
-        // Iterate through branch columns
-        for (int i = 1; i < commitTable.getColumnCount(); i++) {
-            String branchColumnName = commitTable.getColumnName(i);
+        Map<RevCommit, Integer> childCountMap = new HashMap<>();
 
-            // Get the branch head commit for the corresponding branch
-            try {
-                System.out.println(branchColumnName);
-                RevCommit branchHead = getBranchHeadCommit(git, branchColumnName);
-
-                if (branchHead != null && isDescendantOf(repository, commit, branchHead)) {
-                    // Commit is a descendant of the branch head, so it belongs to the branch
-                    row[i] = commit.getName();
-                } else {
-                    // Commit does not belong to the branch
-                    row[i] = "";
-                }
-            } catch (IOException | GitAPIException e) {
-                e.printStackTrace();
+        for (RevCommit commit : commits){
+            System.out.println(commit.getParentCount());
+            for (int i =0 ;i < commit.getParentCount(); i++){
+                int childCount = childCountMap.getOrDefault(commit.getParent(i), 0);
+                childCountMap.put(commit.getParent(i), childCount + 1);
             }
         }
 
-        return row;
+        int n =0 ;
+        for (Ref branch : branches) {
+            branchCommits[n] = (ArrayList<RevCommit>) getCommitsInBranch(branch.getName(), branches, git);
+            n++;
+        }
+
+        for(int i =0 ; i < branches.size(); i++){
+            int curCommitIndex = -1;
+            for (int j = 1 ; j < branchCommits[i].size(); j++){
+                RevCommit tempCommit = branchCommits[i].get(j);
+                if (childCountMap.get(tempCommit) > 1){
+                    curCommitIndex = j;
+                    break;
+                }
+            }
+        }
+
+        for (RevCommit commit : commits) {
+            Object[] rowData = new Object[tableModel.getColumnCount()];
+
+            for (int i =0 ;i < branches.size(); i++) {
+                // 커밋 정보 가져오기
+
+                // 커밋 정보를 테이블에 추가
+                if(branchCommits[i].contains(commit)){
+                    rowData[i] = commit.getId().getName();
+                }
+            }
+            tableModel.addRow(rowData);
+
+        }
+
+
     }
 
-    private boolean isDescendantOf(Repository repository,RevCommit commit, RevCommit branchHead) {
-        // Check if the commit is a descendant of the branch head commit
-        try {
-            RevWalk revWalk = new RevWalk(repository);
-            revWalk.markStart(commit);
-            revWalk.markUninteresting(branchHead);
-            return revWalk.iterator().hasNext();
-        } catch (IOException e) {
-            e.printStackTrace();
+    private List<RevCommit> getCommitsInBranch(String branchName, List<Ref> branches, Git git) throws GitAPIException, IncorrectObjectTypeException, MissingObjectException {
+        List<RevCommit> commits = new ArrayList<>();
+
+        for (Ref branch : branches) {
+            if (branch.getName().equals(branchName)) {
+                LogCommand logCommand = git.log().add(branch.getObjectId());
+                Iterable<RevCommit> branchCommits = logCommand.call();
+
+                for (RevCommit commit : branchCommits) {
+                    commits.add(commit);
+                }
+
+                break;
+            }
         }
-        return false;
+
+        return commits;
     }
+
+
 
 
     private void showErrorMessage(String errorMessage, String errorTitle) {
