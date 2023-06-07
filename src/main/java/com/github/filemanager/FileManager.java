@@ -47,6 +47,7 @@ import org.apache.commons.io.FileUtils;
 import org.eclipse.jgit.api.*;
 import org.eclipse.jgit.api.errors.*;
 
+import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.Ref;
 import org.eclipse.jgit.lib.Repository;
 import org.eclipse.jgit.merge.MergeStrategy;
@@ -2214,7 +2215,7 @@ public class FileManager {
                 public void actionPerformed(ActionEvent e) {
                     String selectedID = (String) logTable.getValueAt(logTable.getSelectedRow(), 0);
                     if (selectedID != null){
-                        showCommitDiff(selectedID);
+                        showCommitDiff(selectedID, repository);
                     }
                 }
             });
@@ -2338,7 +2339,7 @@ public class FileManager {
         }
     }
 
-    private void showCommitDiff(String commitID){
+    private void showCommitDiff(String commitID, Repository repository){
         JTextPane textArea = new JTextPane();
 
         // JTextArea 스크롤 가능하도록 JScrollPane 생성 및 설정
@@ -2350,7 +2351,7 @@ public class FileManager {
         panel.add(titleLabel, BorderLayout.NORTH);
         panel.add(scrollPane, BorderLayout.SOUTH);
 
-        parseCommitDiff(textArea, commitID);
+        parseCommitDiff(textArea, commitID, repository);
 
         SwingUtilities.invokeLater(() -> {
                     scrollPane.getVerticalScrollBar().setValue(0);
@@ -2361,9 +2362,19 @@ public class FileManager {
 
     }
 
-    private void parseCommitDiff(JTextPane textArea, String commitID){
+    private void parseCommitDiff(JTextPane textArea, String commitID, Repository repository){
         try{
-            ProcessBuilder processBuilder = new ProcessBuilder("git", "diff", commitID); //git diff commitID
+            ObjectId commitObjectId = ObjectId.fromString(commitID);
+            RevCommit targetCommit = repository.parseCommit(commitObjectId);
+            String parentCommitID;
+
+            if(targetCommit.getParentCount() > 0){
+                parentCommitID = targetCommit.getParent(0).getId().getName();
+            }else{
+                parentCommitID = "";
+            }
+
+            ProcessBuilder processBuilder = new ProcessBuilder("git", "diff", parentCommitID, commitID); //git diff commitID
             //를 통해 해당 커밋의 내용 불러오기
             if (currentFile.isFile()){ //파일일 경우 오류 발생하므로 부모 디렉토리에서 실행되도록 수정
                 processBuilder.directory(new File(currentFile.getParentFile().getAbsolutePath()));
@@ -2374,6 +2385,7 @@ public class FileManager {
 
             BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream()));
             String line;
+
 
             while ((line = reader.readLine()) != null) {
                 if (line.startsWith("+")){ //추가한 내용은 초록색
