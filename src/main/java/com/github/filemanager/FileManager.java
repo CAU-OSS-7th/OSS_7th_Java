@@ -2374,7 +2374,8 @@ public class FileManager {
 
     private void parseCommitDiff(JTextPane textArea, String commitID){
         try{
-            ProcessBuilder processBuilder = new ProcessBuilder("git", "diff", commitID);
+            ProcessBuilder processBuilder = new ProcessBuilder("git", "diff", commitID); //git diff commitID
+            //를 통해 해당 커밋의 내용 불러오기
             if (currentFile.isFile()){ //파일일 경우 오류 발생하므로 부모 디렉토리에서 실행되도록 수정
                 processBuilder.directory(new File(currentFile.getParentFile().getAbsolutePath()));
             }else{
@@ -2386,11 +2387,11 @@ public class FileManager {
             String line;
 
             while ((line = reader.readLine()) != null) {
-                if (line.startsWith("+")){
+                if (line.startsWith("+")){ //추가한 내용은 초록색
                     appendToPane(textArea, line+"\n", new Color(0,153,76));
-                }else if (line.startsWith("-")){
+                }else if (line.startsWith("-")){ //제거한 내용은 빨간색
                     appendToPane(textArea, line+"\n", Color.red);
-                }else {
+                }else { //그 외는 검은색
                     appendToPane(textArea, line+"\n", Color.black);
 
                 }
