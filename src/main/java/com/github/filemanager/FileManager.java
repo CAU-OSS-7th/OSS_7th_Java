@@ -2109,15 +2109,14 @@ public class FileManager {
             Git git = new Git(repository);
 
 
-            DefaultTableModel tableModel = new DefaultTableModel(){
+            DefaultTableModel tableModel = new DefaultTableModel(){ //테이블을 수정하지 못하도록 방지
                 public boolean isCellEditable(int row, int column) {
                     // 모든 셀을 편집 불가능하도록 설정
                     return false;
                 }
             };
-            List<Ref> branches = git.branchList().call();
 
-            // Add branch columns to the table
+            // 테이블의 열을 커밋 ID와 커밋 메시지로 초기화
             tableModel.addColumn("Commit ID");
             tableModel.addColumn("Commit Message");
 
@@ -2154,6 +2153,7 @@ public class FileManager {
             JLabel dateLabel = new JLabel();
             JLabel messageLabel = new JLabel();
 
+            //
             logTable.getSelectionModel().addListSelectionListener(new ListSelectionListener() {
                 @Override
                 public void valueChanged(ListSelectionEvent e) {
@@ -2219,6 +2219,7 @@ public class FileManager {
             mainPanel.add(fieldPanel, BorderLayout.CENTER);
             mainPanel.add(commitInfoPanel, BorderLayout.SOUTH);
 
+            //그래프와 테이블의 위치가 정확히 일치하도록 하기 위해 폰트 크기 조정
             logTable.setFont(new Font("Serif", Font.PLAIN, 11));
             graphField.setFont(new Font("Serif", Font.BOLD, 13));
 
@@ -2227,6 +2228,7 @@ public class FileManager {
             JScrollBar graphScrollbar = graphScrollPane.getVerticalScrollBar();
             JScrollBar tableScrollbar = tableScrollPane.getVerticalScrollBar();
 
+            // 그래프와 테이블이 동시에 같이 스크롤이 되도록 리스너의 수정을 통해 스크롤바가 같은 위치를 가리키도록 설정
             AdjustmentListener adjustmentListener = new AdjustmentListener() {
                 @Override
                 public void adjustmentValueChanged(AdjustmentEvent e) {
@@ -2243,32 +2245,38 @@ public class FileManager {
                 }
             };
 
+            //그래프 필드와 테이블 필드에 커스텀 리스너 추가
             graphScrollbar.addAdjustmentListener(adjustmentListener);
             tableScrollbar.addAdjustmentListener(graphAdjustmentListener);
 
-            graphScrollbar.setVisible(false);
-
+            //좌측 그래프의 "*" 부분의 위치에 정확히 커밋 오브젝트가 같은 테이블 위치에 표시되도록 하기 위한 Boolean 리스트
+            //Checksum이 있다는 것은 그 줄이 커밋 오브젝트가 있다는 의미고, 없다는 것은 그래프의 가지라느 의미
             List<Boolean> syncTableWithGraph= new ArrayList<>();
 
+            //ProcessBuilder를 통해 git log 파싱 후 JTextArea에 출력
             parseGraphLog(graphField, syncTableWithGraph);
+            //커밋 테이블에 커밋 오브젝트 출력. 위치는 그래프의 커밋 오브젝트 출력 지점과 동일하도록 수정
             drawCommitTable(git, tableModel, syncTableWithGraph);
 
+            //그래프의 수직 스크롤을 없앰으로써 가시성 추가
             graphScrollPane.setVerticalScrollBarPolicy(JScrollPane.VERTICAL_SCROLLBAR_NEVER);
-
-
-
 
             int optionPane = JOptionPane.showOptionDialog(gui, mainPanel, "Git Commit", JOptionPane.OK_CANCEL_OPTION,JOptionPane.QUESTION_MESSAGE,null,null,JOptionPane.YES_OPTION);
             repository.close();
-        } catch (IOException | GitAPIException e) {
+        } catch (IOException e) {
             e.printStackTrace();
         }
     }
 
+    /**
+     * ProcessBuilder를 통해 그래프 출력을 파싱하여 JTextArea에 출력되도록 설정
+     * @param textArea
+     * @param syncTableWithGraph
+     */
     private void parseGraphLog(JTextArea textArea, List<Boolean> syncTableWithGraph){
         try {
             ProcessBuilder processBuilder = new ProcessBuilder("git", "log", "--graph", "--pretty=oneline");
-            if (currentFile.isFile()){
+            if (currentFile.isFile()){ //파일일 경우 오류 발생하므로 부모 디렉토리에서 실행되도록 수정
                 processBuilder.directory(new File(currentFile.getParentFile().getAbsolutePath()));
             }else{
                 processBuilder.directory(new File(currentFile.getAbsolutePath()));
@@ -2281,28 +2289,29 @@ public class FileManager {
             StringBuilder output = new StringBuilder();
             output.append("\n");
 
+            //알파벳이 있는 Checksum을 인식하기 위한 Pattern Matcher 선언
             Pattern pattern = Pattern.compile("[a-zA-Z]");
             Matcher matcher;
             boolean containsAlphabet;
 
             while ((line = reader.readLine()) != null) {
-                if(pattern.matcher(line).find()){
+                if(pattern.matcher(line).find()){ //알파벳이 인식된다는 것은 Checksum이 있다는 의미로, 리스트에 True 저장
                     syncTableWithGraph.add(true);
-                }else{
+                }else{ //없다는 것은 Checksum이 없다는 의미로, 리스트에 False 저장. 이를 통해 테이블은 빈 행이 표시된다.
                     syncTableWithGraph.add(false);
                 }
 
                 StringBuilder trimBuilder = new StringBuilder();
 
                 for (char c : line.toCharArray()) {
-                    if (!Character.isLetterOrDigit(c)) {
+                    if (!Character.isLetterOrDigit(c)) { //그래프의 모양만 출력되도록, Checksum 이후의 부분은 모조리 잘라내기
                         trimBuilder.append(c);
                     } else {
                         break;
                     }
                 }
 
-                output.append(trimBuilder.toString());
+                output.append(trimBuilder); //Text Area에 추가
                 output.append("\n");
             }
 
@@ -2317,6 +2326,13 @@ public class FileManager {
         }
     }
 
+
+    /**
+     * 커밋 테이블을 채우기 위한 함수. 그래프의 커밋 오브젝트 출력 지점과 일치하도록 하기 위해, 커밋 오브젝트가 없는 지점은 빈 행으로 표시
+     * @param git
+     * @param tableModel
+     * @param syncTableWithGraph
+     */
     private void drawCommitTable(Git git, DefaultTableModel tableModel, List<Boolean> syncTableWithGraph){
         try{
             Iterable<RevCommit> commits = git.log().call();
@@ -2327,7 +2343,7 @@ public class FileManager {
 
                 String commitId = commit.getId().getName();
                 String commitMessage = commit.getShortMessage();
-                if(!syncTableWithGraph.get(i)){
+                if(!syncTableWithGraph.get(i)){ //해당 줄에 커밋 오브젝트가 없으면 빈 행으로 출력
                     while(!syncTableWithGraph.get(i)){
                         rowData[0] = null;
                         rowData[1] = null;
@@ -2347,6 +2363,13 @@ public class FileManager {
             e.printStackTrace();
         }
     }
+
+// Java에는 그래프 API가 그나마 명령어가 간단한 것이 JUNG API 인데, 처음에 이를 통해 구현하다가 제대로 출력이 되지 않고, 심지어 JScrollPane이
+// 그래프를 인식하지 못하는 상황이 발생해 그래프가 계속 잘리는 문제가 생겨 완전한 그래프 시각화는 불가능하다고 판단했다.
+// GraphQL, JavaFX까지도 고려해봤는데, 우리가 원하는 노드 그래프는 지원하지 않았으며, JGit과 호환성이 매우 떨어져 구현이 매우 힘들었다.
+// 이에 타협점을 고려, Process Builder를 통해 그래프 명령어로 그래프 모양을 출력하고, JTable에서 위치를 그래프 모양과 일치하도록 하여
+// 어느정도 시각화 및 정보 출력이 가능하도록 했다.
+// Checksum 이 존재하지 않으면 graph의 edge부분이라고 판단하여 테이블에는 빈행으로 표시되도록 하여 커밋 오브젝트가 나타나는 지점이 정확히 일치하도록 하였다.
 
     private void showErrorMessage(String errorMessage, String errorTitle) {
         JOptionPane.showMessageDialog(gui, errorMessage, errorTitle, JOptionPane.ERROR_MESSAGE);
