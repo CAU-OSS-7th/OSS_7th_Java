@@ -25,7 +25,6 @@ package com.github.filemanager;
 
 import java.awt.*;
 import java.awt.event.*;
-import java.awt.image.*;
 import java.io.*;
 import java.net.URL;
 import java.nio.channels.FileChannel;
@@ -44,27 +43,16 @@ import javax.swing.table.*;
 import javax.swing.text.*;
 import javax.swing.tree.*;
 
-import com.google.common.base.StandardSystemProperty;
 import org.apache.commons.io.FileUtils;
 import org.eclipse.jgit.api.*;
-import org.eclipse.jgit.api.MergeCommand;
 import org.eclipse.jgit.api.errors.*;
-import org.eclipse.jgit.errors.IncorrectObjectTypeException;
-import org.eclipse.jgit.errors.MissingObjectException;
-import org.eclipse.jgit.internal.storage.commitgraph.CommitGraph;
-import org.eclipse.jgit.lib.ObjectId;
+
 import org.eclipse.jgit.lib.Ref;
 import org.eclipse.jgit.lib.Repository;
-import org.eclipse.jgit.lib.RepositoryBuilder;
 import org.eclipse.jgit.merge.MergeStrategy;
-import org.eclipse.jgit.revplot.AbstractPlotRenderer;
-import org.eclipse.jgit.revplot.PlotCommitList;
-import org.eclipse.jgit.revplot.PlotLane;
-import org.eclipse.jgit.revplot.PlotWalk;
 import org.eclipse.jgit.revwalk.*;
 import org.eclipse.jgit.storage.file.FileRepositoryBuilder;
 
-import static org.eclipse.jgit.lib.Constants.HEAD;
 
 /**
  * A basic File Manager. Requires 1.6+ for the Desktop &amp; SwingWorker classes, amongst other
