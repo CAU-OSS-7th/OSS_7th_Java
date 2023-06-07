@@ -33,12 +33,18 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.*;
 import java.util.List;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import javax.imageio.ImageIO;
 import javax.swing.*;
 import javax.swing.border.*;
 import javax.swing.event.*;
 import javax.swing.filechooser.FileSystemView;
 import javax.swing.table.*;
+import javax.swing.text.AbstractDocument;
+import javax.swing.text.AttributeSet;
+import javax.swing.text.BadLocationException;
+import javax.swing.text.DocumentFilter;
 import javax.swing.tree.*;
 
 import org.apache.commons.io.FileUtils;
@@ -2100,39 +2106,51 @@ public class FileManager {
             Git git = new Git(repository);
 
 
-            DefaultTableModel tableModel = new DefaultTableModel();
+            DefaultTableModel tableModel = new DefaultTableModel(){
+                public boolean isCellEditable(int row, int column) {
+                    // 모든 셀을 편집 불가능하도록 설정
+                    return false;
+                }
+            };
             List<Ref> branches = git.branchList().call();
 
             // Add branch columns to the table
-            for (Ref branch : branches) {
-                String branchColumnName = branch.getName();
-                tableModel.addColumn(branchColumnName);
-            }
+            tableModel.addColumn("Commit ID");
+            tableModel.addColumn("Commit Message");
 
 
-            // Get branch head commit for the specified branch
+            //--------------------UI 구성----------------------
+            JPanel labelPanel = new JPanel(new GridLayout(1,2));
+            JPanel fieldPanel = new JPanel(new BorderLayout(0,0));
+            JPanel commitInfoPanel = new JPanel(new BorderLayout(4,2));
+
+            JPanel mainPanel = new JPanel(new BorderLayout());
+
+            //-----Label 패널--------------
+            JLabel logLabel = new JLabel("Commit Graph (Current Branch : " + repository.getBranch() + ")");
+            labelPanel.add(logLabel);
+
+
+            //-----Graph, Table 패널---------
+            JTextArea graphField = new JTextArea();
+            graphField.setEditable(false);
+            JScrollPane graphScrollPane = new JScrollPane(graphField);
+            graphScrollPane.setPreferredSize(new Dimension(100,300));
 
             JTable logTable = new JTable(tableModel); //커밋 오브젝트를 표기하는 테이블
+            JScrollPane tableScrollPane = new JScrollPane(logTable);
+            tableScrollPane.setPreferredSize(new Dimension(700, 300));
 
-            List <String> branchParent = new ArrayList<>();
-
-            drawCommitTable(repository, tableModel);
-
+            fieldPanel.add(graphScrollPane, BorderLayout.WEST);
+            fieldPanel.add(tableScrollPane, BorderLayout.CENTER);
 
 
-
-            JScrollPane scrollPane = new JScrollPane(logTable);
-
-            scrollPane.setPreferredSize(new Dimension(700, 200));
-            JLabel logLabel = new JLabel("Commit log");
-
-            //밑에 커밋 오브젝트들의 정보를 표시하기 위한 별도의 패널
+            //--------Commit Info 패널-------
             JLabel commitIdLabel = new JLabel();
             JLabel authorLabel = new JLabel();
             JLabel dateLabel = new JLabel();
             JLabel messageLabel = new JLabel();
 
-            // 테이블 행 선택 이벤트 리스너
             logTable.getSelectionModel().addListSelectionListener(new ListSelectionListener() {
                 @Override
                 public void valueChanged(ListSelectionEvent e) {
@@ -2148,16 +2166,24 @@ public class FileManager {
                             }
                             System.out.println(commitId);
                             try{
-                                RevCommit commit = git.getRepository().parseCommit(repository.resolve(commitId)); //커밋 오브젝트 ID를 통해 특정 커밋 오브젝트 정보 불러오기
-                                String author = commit.getAuthorIdent().getName(); //작성자
-                                String date = commit.getAuthorIdent().getWhen().toString(); //커밋 날짜
-                                String message = commit.getFullMessage(); //커밋 메시지
+                                if (commitId != null){
+                                    RevCommit commit = git.getRepository().parseCommit(repository.resolve(commitId)); //커밋 오브젝트 ID를 통해 특정 커밋 오브젝트 정보 불러오기
+                                    String author = commit.getAuthorIdent().getName(); //작성자
+                                    String date = commit.getAuthorIdent().getWhen().toString(); //커밋 날짜
+                                    String message = commit.getFullMessage(); //커밋 메시지
 
-                                // 커밋 정보를 표시하는 JLabel 업데이트
-                                commitIdLabel.setText(commitId);
-                                authorLabel.setText(author);
-                                dateLabel.setText(date);
-                                messageLabel.setText(message);
+                                    // 커밋 정보를 표시하는 JLabel 업데이트
+                                    commitIdLabel.setText(commitId);
+                                    authorLabel.setText(author);
+                                    dateLabel.setText(date);
+                                    messageLabel.setText(message);
+                                }else{
+                                    commitIdLabel.setText(" ");
+                                    authorLabel.setText(" ");
+                                    dateLabel.setText(" ");
+                                    messageLabel.setText(" ");
+                                }
+
                             }catch (IOException e1){
                                 e1.printStackTrace();
                             }
@@ -2167,15 +2193,14 @@ public class FileManager {
                 }
             });
 
-            JPanel commitMainInfo = new JPanel(new BorderLayout(4, 2)); //커밋 정보 패널
-            commitMainInfo.setBorder(new EmptyBorder(0, 6, 0, 6));
+            commitInfoPanel.setBorder(new EmptyBorder(0, 6, 0, 6));
 
             JPanel commitLabel = new JPanel(new GridLayout(0, 1, 2, 2)); //왼쪽의 커밋 정보 분류 레이블
             commitLabel.setForeground(Color.gray);
-            commitMainInfo.add(commitLabel, BorderLayout.WEST);
+            commitInfoPanel.add(commitLabel, BorderLayout.WEST);
 
             JPanel commitDetail = new JPanel(new GridLayout(0, 1, 2, 2)); //오른쪽의 커밋 디테일 레이블
-            commitMainInfo.add(commitDetail, BorderLayout.CENTER);
+            commitInfoPanel.add(commitDetail, BorderLayout.CENTER);
 
             commitLabel.add(new JLabel("Commit ID : ", JLabel.TRAILING)); //레이블 텍스트를 오른쪽으로 정렬
             commitDetail.add(commitIdLabel);
@@ -2186,97 +2211,135 @@ public class FileManager {
             commitLabel.add(new JLabel("Message : ", JLabel.TRAILING));
             commitDetail.add(messageLabel);
 
+            //메인 패널 구성
+            mainPanel.add(labelPanel, BorderLayout.NORTH);
+            mainPanel.add(fieldPanel, BorderLayout.CENTER);
+            mainPanel.add(commitInfoPanel, BorderLayout.SOUTH);
+
+            logTable.setFont(new Font("Serif", Font.PLAIN, 11));
+            graphField.setFont(new Font("Serif", Font.BOLD, 13));
+
+            //-------------------------UI 구성 끝-----------------------
+
+            JScrollBar graphScrollbar = graphScrollPane.getVerticalScrollBar();
+            JScrollBar tableScrollbar = tableScrollPane.getVerticalScrollBar();
+
+            AdjustmentListener adjustmentListener = new AdjustmentListener() {
+                @Override
+                public void adjustmentValueChanged(AdjustmentEvent e) {
+                    int value = e.getValue();
+                    tableScrollbar.setValue(value);
+                }
+            };
+
+            AdjustmentListener graphAdjustmentListener = new AdjustmentListener() {
+                @Override
+                public void adjustmentValueChanged(AdjustmentEvent e) {
+                    int value = e.getValue();
+                    graphScrollbar.setValue(value);
+                }
+            };
+
+            graphScrollbar.addAdjustmentListener(adjustmentListener);
+            tableScrollbar.addAdjustmentListener(graphAdjustmentListener);
+
+            graphScrollbar.setVisible(false);
+
+            List<Boolean> syncTableWithGraph= new ArrayList<>();
+
+            parseGraphLog(graphField, syncTableWithGraph);
+            drawCommitTable(git, tableModel, syncTableWithGraph);
+
+            graphScrollPane.setVerticalScrollBarPolicy(JScrollPane.VERTICAL_SCROLLBAR_NEVER);
 
 
-            JPanel panel = new JPanel(new BorderLayout()); //패널 구성
-            panel.add(logLabel, BorderLayout.NORTH);
-            panel.add(scrollPane, BorderLayout.CENTER);
-            panel.add(commitMainInfo, BorderLayout.SOUTH);
 
-            int optionPane = JOptionPane.showOptionDialog(gui, panel, "Git Commit", JOptionPane.OK_CANCEL_OPTION,JOptionPane.QUESTION_MESSAGE,null,null,JOptionPane.YES_OPTION);
+
+            int optionPane = JOptionPane.showOptionDialog(gui, mainPanel, "Git Commit", JOptionPane.OK_CANCEL_OPTION,JOptionPane.QUESTION_MESSAGE,null,null,JOptionPane.YES_OPTION);
             repository.close();
         } catch (IOException | GitAPIException e) {
             e.printStackTrace();
         }
     }
 
-    private void drawCommitTable(Repository repository, DefaultTableModel tableModel) throws GitAPIException, IOException {
-        Git git = new Git(repository);
+    private void parseGraphLog(JTextArea textArea, List<Boolean> syncTableWithGraph){
+        try {
+            ProcessBuilder processBuilder = new ProcessBuilder("git", "log", "--graph", "--pretty=oneline");
+            processBuilder.directory(new File(currentFile.getAbsolutePath()));
+            Process process = processBuilder.start();
 
-        List<Ref> branches = git.branchList().call();
+            // Read the output of the command
+            BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream()));
+            String line;
+            StringBuilder output = new StringBuilder();
+            output.append("\n");
 
-        Iterable<RevCommit> commits = git.log().all().call();
-        ArrayList<RevCommit>[] branchCommits = new ArrayList[branches.size()];
-        for (int i =0 ;i < branches.size(); i++){
-            branchCommits[i] = new ArrayList<RevCommit>();
-        }
+            Pattern pattern = Pattern.compile("[a-zA-Z]");
+            Matcher matcher;
+            boolean containsAlphabet;
 
-        Map<RevCommit, Integer> childCountMap = new HashMap<>();
-
-        for (RevCommit commit : commits){
-            System.out.println(commit.getParentCount());
-            for (int i =0 ;i < commit.getParentCount(); i++){
-                int childCount = childCountMap.getOrDefault(commit.getParent(i), 0);
-                childCountMap.put(commit.getParent(i), childCount + 1);
-            }
-        }
-
-        int n =0 ;
-        for (Ref branch : branches) {
-            branchCommits[n] = (ArrayList<RevCommit>) getCommitsInBranch(branch.getName(), branches, git);
-            n++;
-        }
-
-        for(int i =0 ; i < branches.size(); i++){
-            int curCommitIndex = -1;
-            for (int j = 1 ; j < branchCommits[i].size(); j++){
-                RevCommit tempCommit = branchCommits[i].get(j);
-                if (childCountMap.get(tempCommit) > 1){
-                    curCommitIndex = j;
-                    break;
+            while ((line = reader.readLine()) != null) {
+                if(pattern.matcher(line).find()){
+                    syncTableWithGraph.add(true);
+                }else{
+                    syncTableWithGraph.add(false);
                 }
-            }
-        }
 
-        for (RevCommit commit : commits) {
-            Object[] rowData = new Object[tableModel.getColumnCount()];
+                StringBuilder trimBuilder = new StringBuilder();
 
-            for (int i =0 ;i < branches.size(); i++) {
-                // 커밋 정보 가져오기
-
-                // 커밋 정보를 테이블에 추가
-                if(branchCommits[i].contains(commit)){
-                    rowData[i] = commit.getId().getName();
+                for (char c : line.toCharArray()) {
+                    if (!Character.isLetterOrDigit(c)) {
+                        trimBuilder.append(c);
+                    } else {
+                        break;
+                    }
                 }
+
+                output.append(trimBuilder.toString());
+                output.append("\n");
             }
-            tableModel.addRow(rowData);
 
+            // Set the output to the JTextArea
+            textArea.setText(output.toString());
+
+            // Close the reader and wait for the process to finish
+            reader.close();
+            process.waitFor();
+        } catch (Exception e) {
+            e.printStackTrace();
         }
-
-
     }
 
-    private List<RevCommit> getCommitsInBranch(String branchName, List<Ref> branches, Git git) throws GitAPIException, IncorrectObjectTypeException, MissingObjectException {
-        List<RevCommit> commits = new ArrayList<>();
+    private void drawCommitTable(Git git, DefaultTableModel tableModel, List<Boolean> syncTableWithGraph){
+        try{
+            Iterable<RevCommit> commits = git.log().call();
+            int i = 0;
 
-        for (Ref branch : branches) {
-            if (branch.getName().equals(branchName)) {
-                LogCommand logCommand = git.log().add(branch.getObjectId());
-                Iterable<RevCommit> branchCommits = logCommand.call();
+            for (RevCommit commit : commits) {
+                Object[] rowData = new Object[tableModel.getColumnCount()];
 
-                for (RevCommit commit : branchCommits) {
-                    commits.add(commit);
+                String commitId = commit.getId().getName();
+                String commitMessage = commit.getShortMessage();
+                if(!syncTableWithGraph.get(i)){
+                    while(!syncTableWithGraph.get(i)){
+                        rowData[0] = null;
+                        rowData[1] = null;
+                        tableModel.addRow(rowData);
+                        i++;
+                    }
                 }
+                rowData[0] = commitId;
+                rowData[1] = commitMessage;
+                i++;
 
-                break;
+                tableModel.addRow(rowData);
+
             }
+
+        }catch (GitAPIException e){
+            e.printStackTrace();
         }
-
-        return commits;
     }
-
-
-
 
     private void showErrorMessage(String errorMessage, String errorTitle) {
         JOptionPane.showMessageDialog(gui, errorMessage, errorTitle, JOptionPane.ERROR_MESSAGE);
