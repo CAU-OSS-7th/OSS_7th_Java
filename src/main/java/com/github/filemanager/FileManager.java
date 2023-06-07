@@ -2152,6 +2152,9 @@ public class FileManager {
             JLabel authorLabel = new JLabel();
             JLabel dateLabel = new JLabel();
             JLabel messageLabel = new JLabel();
+            JButton commitDiffButton = new JButton("Show Diff");
+            commitDiffButton.setSize(new Dimension(100,50));
+            commitDiffButton.setVisible(false);
 
             //
             logTable.getSelectionModel().addListSelectionListener(new ListSelectionListener() {
@@ -2180,11 +2183,13 @@ public class FileManager {
                                     authorLabel.setText(author);
                                     dateLabel.setText(date);
                                     messageLabel.setText(message);
+                                    commitDiffButton.setVisible(true);
                                 }else{
                                     commitIdLabel.setText(" ");
                                     authorLabel.setText(" ");
                                     dateLabel.setText(" ");
                                     messageLabel.setText(" ");
+                                    commitDiffButton.setVisible(false);
                                 }
 
                             }catch (IOException e1){
@@ -2214,12 +2219,26 @@ public class FileManager {
             commitLabel.add(new JLabel("Message : ", JLabel.TRAILING));
             commitDetail.add(messageLabel);
 
+            commitLabel.add(new JLabel("Commit Diff : ", JLabel.TRAILING));
+            commitDetail.add(commitDiffButton);
+
+            commitDiffButton.addActionListener(new ActionListener() {//public 입력창으로 변환.
+                @Override
+                public void actionPerformed(ActionEvent e) {
+                    String selectedID = (String) logTable.getValueAt(logTable.getSelectedRow(), 0);
+                    if (selectedID != null){
+                        showCommitDiff(selectedID);
+                    }
+                }
+            });
+
+
             //메인 패널 구성
             mainPanel.add(labelPanel, BorderLayout.NORTH);
             mainPanel.add(fieldPanel, BorderLayout.CENTER);
             mainPanel.add(commitInfoPanel, BorderLayout.SOUTH);
 
-            //그래프와 테이블의 위치가 정확히 일치하도록 하기 위해 폰트 크기 조정
+            //그래프와 테이블의 위치가 정확히 일치하도록 하기 위해 폰트 크기 채정
             logTable.setFont(new Font("Serif", Font.PLAIN, 11));
             graphField.setFont(new Font("Serif", Font.BOLD, 13));
 
@@ -2257,6 +2276,12 @@ public class FileManager {
             parseGraphLog(graphField, syncTableWithGraph);
             //커밋 테이블에 커밋 오브젝트 출력. 위치는 그래프의 커밋 오브젝트 출력 지점과 동일하도록 수정
             drawCommitTable(git, tableModel, syncTableWithGraph);
+
+            SwingUtilities.invokeLater(() -> {
+                graphScrollPane.getVerticalScrollBar().setValue(0);
+                tableScrollPane.getVerticalScrollBar().setValue(0);
+            }
+            );
 
             //그래프의 수직 스크롤을 없앰으로써 가시성 추가
             graphScrollPane.setVerticalScrollBarPolicy(JScrollPane.VERTICAL_SCROLLBAR_NEVER);
@@ -2326,6 +2351,54 @@ public class FileManager {
         }
     }
 
+    private void showCommitDiff(String commitID){
+        JTextArea textArea = new JTextArea();
+
+        // JTextArea 스크롤 가능하도록 JScrollPane 생성 및 설정
+        JScrollPane scrollPane = new JScrollPane(textArea);
+        JLabel titleLabel = new JLabel("Commit Diff (" + commitID + ")");
+        scrollPane.setPreferredSize(new Dimension(450,350));
+
+        JPanel panel = new JPanel(new BorderLayout());
+        panel.add(titleLabel, BorderLayout.NORTH);
+        panel.add(scrollPane, BorderLayout.SOUTH);
+
+        parseCommitDiff(textArea, commitID);
+
+        SwingUtilities.invokeLater(() -> {
+                    scrollPane.getVerticalScrollBar().setValue(0);
+                }
+        );
+
+        int optionPane = JOptionPane.showOptionDialog(gui, panel, "Git Commit Diff", JOptionPane.OK_CANCEL_OPTION,JOptionPane.QUESTION_MESSAGE,null,null,JOptionPane.YES_OPTION);
+
+    }
+
+    private void parseCommitDiff(JTextArea textArea, String commitID){
+        try{
+            ProcessBuilder processBuilder = new ProcessBuilder("git", "diff", commitID);
+            if (currentFile.isFile()){ //파일일 경우 오류 발생하므로 부모 디렉토리에서 실행되도록 수정
+                processBuilder.directory(new File(currentFile.getParentFile().getAbsolutePath()));
+            }else{
+                processBuilder.directory(new File(currentFile.getAbsolutePath()));
+            }
+            Process process = processBuilder.start();
+
+            BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream()));
+            String line;
+            StringBuilder output = new StringBuilder();
+            output.append("\n");
+
+            while ((line = reader.readLine()) != null) {
+                    output.append(line);
+                    output.append("\n");
+            }
+
+            textArea.setText(output.toString());
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
 
     /**
      * 커밋 테이블을 채우기 위한 함수. 그래프의 커밋 오브젝트 출력 지점과 일치하도록 하기 위해, 커밋 오브젝트가 없는 지점은 빈 행으로 표시
